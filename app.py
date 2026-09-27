@@ -456,7 +456,7 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
         params.extend([wc, wc, wc])
 
     query += " ORDER BY id DESC"
-    cursor.execute(query, params)
+    cursor.execute(query, tuple(params))
     records = cursor.fetchall()
     conn.close()
 
