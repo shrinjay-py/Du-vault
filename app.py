@@ -1,5 +1,5 @@
 import os
-import sqlite3
+import libsql_experimental as sqlite3
 import io
 import re
 from fastapi import FastAPI, UploadFile, File, Form, Response, Request
@@ -7,6 +7,13 @@ from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 
 app = FastAPI(title="DU PYQ Vault")
 DB_FILE = "du_pyq_vault.db"
+TURSO_DB_URL = os.getenv("TURSO_DB_URL")
+TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
+
+def get_db():
+    if TURSO_DB_URL and TURSO_AUTH_TOKEN:
+        return sqlite3.connect(TURSO_DB_URL, auth_token=TURSO_AUTH_TOKEN)
+    return sqlite3.connect("du_pyq_vault.db") 
 
 # --- CONFIGURATION ---
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")  # Change this to your chosen password
@@ -34,7 +41,7 @@ COURSES = [
 SEMESTERS = ["All Semesters", "Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 6"]
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS du_resources (
@@ -432,7 +439,7 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
 def index(request: Request, q: str = "", course: str = "All Courses", sem: str = "All Semesters"):
     is_admin = request.cookies.get("du_admin_session") == "authenticated"
     
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db()
     cursor = conn.cursor()
     query = "SELECT id, title, course, semester, year, type, url_or_name, file_size FROM du_resources WHERE 1=1"
     params = []
@@ -538,7 +545,7 @@ async def upload_files(
     if request.cookies.get("du_admin_session") != "authenticated":
         return HTMLResponse("Unauthorized. Please log in as Admin.", status_code=403)
 
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db()
     cursor = conn.cursor()
     for file in files:
         if file.filename.lower().endswith(".pdf"):
@@ -566,7 +573,7 @@ def add_link(
     if request.cookies.get("du_admin_session") != "authenticated":
         return HTMLResponse("Unauthorized.", status_code=403)
 
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO du_resources (title, course, semester, year, type, url_or_name, file_data, file_size)
@@ -578,7 +585,7 @@ def add_link(
 
 @app.get("/download/{item_id}")
 def download_pdf(item_id: int):
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT title, file_data FROM du_resources WHERE id = ?", (item_id,))
     row = cursor.fetchone()
@@ -596,7 +603,7 @@ def delete_item(request: Request, item_id: int):
     if request.cookies.get("du_admin_session") != "authenticated":
         return HTMLResponse("Unauthorized.", status_code=403)
 
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM du_resources WHERE id = ?", (item_id,))
     conn.commit()
