@@ -516,11 +516,11 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
 
 @app.post("/login")
 def login(password: str = Form(...)):
-    response = RedirectResponse(url="/", status_code=303)
     if password == ADMIN_PASSWORD:
-        response.set_cookie(key="du_admin_session", value="authenticated", httponly=True)
-    return response
-
+        response = RedirectResponse(url="/", status_code=303)
+        response.set_cookie(key="admin_session", value="authenticated", httponly=True)
+        return response
+    return HTMLResponse("Invalid Password", status_code=401)
 @app.get("/logout")
 def logout():
     response = RedirectResponse(url="/", status_code=303)
