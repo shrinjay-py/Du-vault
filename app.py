@@ -458,7 +458,7 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
         cards_html = '<div class="card" style="text-align:center; padding:30px;"><p style="color:var(--text-muted);">No question papers found.</p></div>'
     else:
         for item_id, title, c, s, y, r_type, url_or_name, size in records:
-            action_btn = f'<a class="btn-pill" href="/download/{item_id}" target="_blank">📄 View PDF</a>' if r_type == "pdf" else f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
+            action_btn  = f'<a class="btn-pill" href="/download/{item_id}" download>📥 Download PDF</a>' if r_type == "pdf" else f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
             
             # Show delete button only if logged in as Admin
             del_form = ""
