@@ -9,7 +9,7 @@ app = FastAPI(title="DU PYQ Vault")
 DB_FILE = "du_pyq_vault.db"
 
 # --- CONFIGURATION ---
-ADMIN_PASSWORD = "admin123"  # Change this to your chosen password
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")  # Change this to your chosen password
 
 COURSES = [
     "All Courses",
