@@ -525,13 +525,13 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
 def login(password: str = Form(...)):
     if password == ADMIN_PASSWORD:
         response = RedirectResponse(url="/", status_code=303)
-        response.set_cookie(key="admin_session", value="authenticated", httponly=True)
+        response.set_cookie(key="du_admin_session", value="authenticated", httponly=True)
         return response
     return HTMLResponse("Invalid Password", status_code=401)
 @app.get("/logout")
 def logout():
     response = RedirectResponse(url="/", status_code=303)
-    response.delete_cookie(key="admin_session")
+    response.delete_cookie(key="du_admin_session")
     return response
 
 @app.post("/upload")
@@ -594,7 +594,7 @@ def download_pdf(item_id: int):
         return StreamingResponse(
             io.BytesIO(row[1]),
             media_type="application/pdf",
-            headers={"Content-Disposition": f'inline; filename="{row[0]}.pdf"'}
+            headers={"Content-Disposition": f'attachment; filename="{row[0]}.pdf"'}
         )
     return HTMLResponse("Not Found", status_code=404)
 
