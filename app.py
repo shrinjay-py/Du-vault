@@ -524,7 +524,7 @@ def login(password: str = Form(...)):
 @app.get("/logout")
 def logout():
     response = RedirectResponse(url="/", status_code=303)
-    response.delete_cookie("du_admin_session")
+    response.delete_cookie(key="admin_session")
     return response
 
 @app.post("/upload")
