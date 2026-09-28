@@ -472,7 +472,7 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
                  <a class="btn-pill btn-caramel" href="/download/{item_id}" style="flex: 1; text-align: center;">📥 Save</a>
              </div>
              """
-         else:
+          else:
               action_btn = f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
             
             # Show delete button only if logged in as Admin
