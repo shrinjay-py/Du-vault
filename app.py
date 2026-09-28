@@ -12,8 +12,11 @@ TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
 
 def get_db():
     if TURSO_DB_URL and TURSO_AUTH_TOKEN:
+        print("[DB STATUS] Connecting to TURSO CLOUD DB...")
         return sqlite3.connect(TURSO_DB_URL, auth_token=TURSO_AUTH_TOKEN)
-    return sqlite3.connect("du_pyq_vault.db")
+    else:
+        print("[DB WARNING] Missing Turso credentials! Falling back to EPHEMERAL local disk.")
+        return sqlite3.connect("du_pyq_vault.db")
 
 # --- CONFIGURATION ---
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
