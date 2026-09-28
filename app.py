@@ -112,7 +112,7 @@ PWA_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" 
   <text x="256" y="365" font-family="sans-serif" font-size="34" letter-spacing="4" font-weight="bold" fill="#1E1A17" text-anchor="middle">VAULT</text>
 </svg>"""
 
-SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v4';
+SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v5';
 const PRECACHE = ['/', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -261,7 +261,7 @@ HTML_TEMPLATE = """
             text-decoration: underline;
             cursor: pointer;
         }
-        .container { max-width: 600px; margin: 0 auto; padding: 16px; }
+        .container { max-width: 650px; margin: 0 auto; padding: 16px; }
 
         /* PWA Install Banner */
         .install-box {
@@ -293,69 +293,62 @@ HTML_TEMPLATE = """
             cursor: pointer;
         }
 
-        /* Course Folders Shelf */
-        .shelf-label {
-            font-size: 0.78rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-muted);
-            margin: 4px 0 8px 2px;
+        /* Course Folder Grid */
+        .folder-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 12px;
+            margin: 12px 0 20px 0;
         }
-        .folder-scroll {
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding: 2px 2px 14px 2px;
-            scrollbar-width: none;
-            -webkit-overflow-scrolling: touch;
-        }
-        .folder-scroll::-webkit-scrollbar { display: none; }
-        .folder-chip {
-            flex: 0 0 auto;
+        .folder-card {
             text-decoration: none;
             color: var(--text-dark);
             background: var(--card-foam);
             border: 1px solid var(--border-latte);
             border-radius: 16px;
-            padding: 10px 14px;
+            padding: 18px 12px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-width: 84px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-            transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
         }
-        .folder-chip:active { transform: scale(0.96); }
-        .folder-chip.active {
-            border: 2px solid var(--caramel);
-            background: #F4EAE0;
-            font-weight: 700;
+        .folder-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+            border-color: var(--caramel);
         }
-        .folder-icon { font-size: 1.5rem; margin-bottom: 4px; }
-        .folder-name { font-size: 0.72rem; font-weight: 600; text-align: center; white-space: nowrap; }
+        .folder-card:active { transform: scale(0.97); }
+        .folder-card-icon { font-size: 2.2rem; margin-bottom: 8px; }
+        .folder-card-title { font-size: 0.82rem; font-weight: 700; text-align: center; }
+        .folder-card-count { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; }
 
-        /* Active Directory Indicator */
-        .directory-indicator {
+        /* Inside Folder Directory Bar */
+        .folder-header-bar {
             display: flex;
             align-items: center;
             justify-content: space-between;
             background: var(--card-foam);
             border: 1px solid var(--border-latte);
-            border-left: 4px solid var(--caramel);
-            border-radius: 12px;
-            padding: 10px 14px;
+            border-radius: 16px;
+            padding: 14px 18px;
             margin-bottom: 14px;
         }
-        .directory-indicator span {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--text-dark);
+        .folder-header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Georgia', serif;
+            font-size: 1.1rem;
+            font-weight: bold;
         }
-        .clear-filter-btn {
-            font-size: 0.78rem;
-            color: #BA1A1A;
+        .back-folder-btn {
+            background: var(--espresso);
+            color: #FAF6F2;
             text-decoration: none;
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-size: 0.78rem;
             font-weight: 600;
         }
 
@@ -419,7 +412,7 @@ HTML_TEMPLATE = """
     <a href="/" class="brand-title">DU VAULT</a>
     <div class="brand-right">
         <div class="founder-tag">
-            <div>Founded by <span class="founder-name">Shrinjay Raj</span></div>
+            <div>Founded by <span class="founder-name">Shrinjay</span></div>
             <span class="college-subtag">(Hansraj College)</span>
         </div>
         {admin_header_btn}
@@ -434,21 +427,7 @@ HTML_TEMPLATE = """
         <button id="pwa-install-btn" class="install-btn">Install</button>
     </div>
 
-    <div class="shelf-label">Course Folders</div>
-    {folder_tiles_html}
-
-    {active_directory_banner}
-
-    <form method="GET" action="/">
-        <input type="hidden" name="course" value="{course_val}">
-        <div class="search-box">
-            <input type="text" name="q" value="{query}" placeholder="🔍 Search in this folder..." onchange="this.form.submit()">
-        </div>
-        <div class="filters">
-            <select name="sem" onchange="this.form.submit()">{sem_options}</select>
-        </div>
-    </form>
-    <div>{cards_html}</div>
+    {main_view_content}
 </div>
 
 {fab_controls}
@@ -578,7 +557,7 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
         else:
             detected_sem = "Sem 1"
 
-    # 3. Detect Course (Expanded for Botany and major programs)
+    # 3. Detect Course
     detected_course = fallback_course
     if fallback_course == "auto":
         botany_keywords = [
@@ -627,86 +606,128 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
     return clean_title, detected_course, detected_sem, detected_year
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, q: str = "", course: str = "All Courses", sem: str = "All Semesters"):
+def index(request: Request, q: str = "", course: str = "", sem: str = "All Semesters"):
     is_admin = request.cookies.get("du_admin_session") == "authenticated"
-    
     conn = get_db()
     cursor = conn.cursor()
-    query = "SELECT id, title, course, semester, year, type, url_or_name, file_size FROM du_resources WHERE 1=1"
-    params = []
 
-    if course != "All Courses":
-        query += " AND course = ?"
-        params.append(course)
-    if sem != "All Semesters":
-        query += " AND semester = ?"
-        params.append(sem)
-    if q.strip():
-        query += " AND (LOWER(title) LIKE ? OR LOWER(course) LIKE ? OR LOWER(year) LIKE ?)"
-        wc = f"%{q.strip().lower()}%"
-        params.extend([wc, wc, wc])
+    # Get resource counts per course for folders
+    cursor.execute("SELECT course, COUNT(*) FROM du_resources GROUP BY course")
+    counts = dict(cursor.fetchall())
 
-    query += " ORDER BY id DESC"
-    cursor.execute(query, tuple(params))
-    records = cursor.fetchall()
-    conn.close()
+    main_view_content = ""
 
-    cards_html = ""
-    if not records:
-        cards_html = f'<div class="card" style="text-align:center; padding:32px;"><p style="color:var(--text-muted); font-size:0.9rem;">No papers found in <b>{course}</b>.</p></div>'
-    else:
-        for item_id, title, c, s, y, r_type, url_or_name, size in records:
-            if r_type == "pdf":
-                action_btn = f"""
-                <div style="display: flex; gap: 8px; margin-top: 8px;">
-                    <a class="btn-pill" href="/view/{item_id}" target="_blank" style="flex: 1; text-align: center;">👁️ View</a>
-                    <a class="btn-pill btn-caramel" href="/download/{item_id}" style="flex: 1; text-align: center;">📥 Save</a>
-                </div>
-                """
-            else:
-                action_btn = f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
-
-            del_form = ""
-            if is_admin:
-                del_form = f"""
-                <form action="/delete/{item_id}" method="POST" onsubmit="return confirm('Delete paper?');">
-                    <button type="submit" class="del-btn">✕</button>
-                </form>
-                """
-
-            cards_html += f"""
-            <div class="card">
-                <div class="card-top">
-                    <span class="badge">{c}</span>
-                    {del_form}
-                </div>
-                <div class="card-title">{title}</div>
-                <div class="card-meta">🎓 {s} &nbsp;•&nbsp; 📅 {y} &nbsp;•&nbsp; 💾 {size}</div>
-                {action_btn}
-            </div>
+    # SCENARIO 1: HOME PAGE (Clean Folder Drive Interface)
+    if not course and not q.strip():
+        folders_grid = '<div style="font-size: 0.82rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">Select Course Folder</div>'
+        folders_grid += '<div class="folder-grid">'
+        for tile in COURSE_TILES:
+            encoded_c = urllib.parse.quote_plus(tile["name"])
+            num_papers = counts.get(tile["name"], 0)
+            folders_grid += f"""
+            <a href="/?course={encoded_c}" class="folder-card">
+                <div class="folder-card-icon">{tile["icon"]}</div>
+                <div class="folder-card-title">{tile["label"]}</div>
+                <div class="folder-card-count">{num_papers} papers</div>
+            </a>
             """
+        folders_grid += '</div>'
 
-    # Horizontal Folder Chips
-    folder_tiles_html = '<div class="folder-scroll">'
-    all_active = "active" if course == "All Courses" else ""
-    folder_tiles_html += f'<a href="/?course=All+Courses" class="folder-chip {all_active}"><div class="folder-icon">📂</div><div class="folder-name">All</div></a>'
-    for tile in COURSE_TILES:
-        is_active = "active" if tile["name"] == course else ""
-        encoded_c = urllib.parse.quote_plus(tile["name"])
-        folder_tiles_html += f'<a href="/?course={encoded_c}" class="folder-chip {is_active}"><div class="folder-icon">{tile["icon"]}</div><div class="folder-name">{tile["label"]}</div></a>'
-    folder_tiles_html += '</div>'
+        search_bar = """
+        <form method="GET" action="/">
+            <div class="search-box" style="margin-top: 10px;">
+                <input type="text" name="q" placeholder="🔍 Search any paper across all courses...">
+            </div>
+        </form>
+        """
+        main_view_content = search_bar + folders_grid
 
-    # Directory Indicator Banner
-    active_directory_banner = ""
-    if course != "All Courses":
-        active_directory_banner = f"""
-        <div class="directory-indicator">
-            <span>📁 Showing folder: <b>{course}</b> ({len(records)} papers)</span>
-            <a href="/?course=All+Courses" class="clear-filter-btn">✕ Clear folder filter</a>
+    # SCENARIO 2: INSIDE A SPECIFIC FOLDER OR PERFORMING A GLOBAL SEARCH
+    else:
+        query = "SELECT id, title, course, semester, year, type, url_or_name, file_size FROM du_resources WHERE 1=1"
+        params = []
+
+        if course:
+            query += " AND course = ?"
+            params.append(course)
+        if sem != "All Semesters":
+            query += " AND semester = ?"
+            params.append(sem)
+        if q.strip():
+            query += " AND (LOWER(title) LIKE ? OR LOWER(course) LIKE ? OR LOWER(year) LIKE ?)"
+            wc = f"%{q.strip().lower()}%"
+            params.extend([wc, wc, wc])
+
+        query += " ORDER BY id DESC"
+        cursor.execute(query, tuple(params))
+        records = cursor.fetchall()
+
+        # Find Icon for folder header
+        matched_tile = next((t for t in COURSE_TILES if t["name"] == course), None)
+        folder_icon = matched_tile["icon"] if matched_tile else "📁"
+        folder_display_name = matched_tile["label"] if matched_tile else (course or f"Search: '{q}'")
+
+        header_bar = f"""
+        <div class="folder-header-bar">
+            <div class="folder-header-title">
+                <span>{folder_icon}</span>
+                <span>{folder_display_name}</span>
+            </div>
+            <a href="/" class="back-folder-btn">← All Folders</a>
         </div>
         """
 
-    sem_opts = "".join(f'<option value="{s}" {"selected" if s == sem else ""}>{s}</option>' for s in SEMESTERS)
+        search_filter_form = f"""
+        <form method="GET" action="/">
+            <input type="hidden" name="course" value="{course}">
+            <div class="search-box">
+                <input type="text" name="q" value="{q}" placeholder="🔍 Search inside this folder..." onchange="this.form.submit()">
+            </div>
+            <div class="filters">
+                <select name="sem" onchange="this.form.submit()">{ "".join(f'<option value="{s}" {"selected" if s == sem else ""}>{s}</option>' for s in SEMESTERS) }</select>
+            </div>
+        </form>
+        """
+
+        cards_html = ""
+        if not records:
+            cards_html = f'<div class="card" style="text-align:center; padding:36px;"><p style="color:var(--text-muted);">No papers found inside this folder.</p></div>'
+        else:
+            for item_id, title, c, s, y, r_type, url_or_name, size in records:
+                if r_type == "pdf":
+                    action_btn = f"""
+                    <div style="display: flex; gap: 8px; margin-top: 8px;">
+                        <a class="btn-pill" href="/view/{item_id}" target="_blank" style="flex: 1; text-align: center;">👁️ View</a>
+                        <a class="btn-pill btn-caramel" href="/download/{item_id}" style="flex: 1; text-align: center;">📥 Save</a>
+                    </div>
+                    """
+                else:
+                    action_btn = f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
+
+                del_form = ""
+                if is_admin:
+                    del_form = f"""
+                    <form action="/delete/{item_id}" method="POST" onsubmit="return confirm('Delete paper?');">
+                        <button type="submit" class="del-btn">✕</button>
+                    </form>
+                    """
+
+                cards_html += f"""
+                <div class="card">
+                    <div class="card-top">
+                        <span class="badge">{c}</span>
+                        {del_form}
+                    </div>
+                    <div class="card-title">{title}</div>
+                    <div class="card-meta">🎓 {s} &nbsp;•&nbsp; 📅 {y} &nbsp;•&nbsp; 💾 {size}</div>
+                    {action_btn}
+                </div>
+                """
+
+        main_view_content = header_bar + search_filter_form + cards_html
+
+    conn.close()
+
     up_course_opts = "".join(f'<option value="{c}">{c}</option>' for c in COURSES[1:])
     up_sem_opts = "".join(f'<option value="{s}">{s}</option>' for s in SEMESTERS[1:])
 
@@ -725,14 +746,9 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
         fab_controls = ""
 
     content = HTML_TEMPLATE
-    content = content.replace("{query}", q)
-    content = content.replace("{course_val}", course)
-    content = content.replace("{folder_tiles_html}", folder_tiles_html)
-    content = content.replace("{active_directory_banner}", active_directory_banner)
-    content = content.replace("{sem_options}", sem_opts)
+    content = content.replace("{main_view_content}", main_view_content)
     content = content.replace("{upload_course_options}", up_course_opts)
     content = content.replace("{upload_sem_options}", up_sem_opts)
-    content = content.replace("{cards_html}", cards_html)
     content = content.replace("{admin_header_btn}", admin_header_btn)
     content = content.replace("{admin_banner_html}", admin_banner_html)
     content = content.replace("{fab_controls}", fab_controls)
@@ -766,6 +782,7 @@ async def upload_files(
 
     conn = get_db()
     cursor = conn.cursor()
+    last_detected_course = None
     for file in files:
         if file.filename.lower().endswith(".pdf"):
             data = await file.read()
@@ -773,13 +790,16 @@ async def upload_files(
             clean_title, detected_course, detected_sem, detected_year = parse_filename(
                 file.filename, course, sem, year
             )
+            last_detected_course = detected_course
             cursor.execute("""
                 INSERT INTO du_resources (title, course, semester, year, type, url_or_name, file_data, file_size)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (clean_title, detected_course, detected_sem, detected_year, "pdf", file.filename, data, size_mb))
     conn.commit()
     conn.close()
-    return RedirectResponse(url="/", status_code=303)
+
+    redirect_url = f"/?course={urllib.parse.quote_plus(last_detected_course)}" if last_detected_course else "/"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 @app.post("/add-link")
 def add_link(
@@ -800,7 +820,7 @@ def add_link(
     """, (title, course, sem, "Web", "link", url, None, "Link"))
     conn.commit()
     conn.close()
-    return RedirectResponse(url="/", status_code=303)
+    return RedirectResponse(url=f"/?course={urllib.parse.quote_plus(course)}", status_code=303)
 
 @app.get("/download/{item_id}")
 def download_pdf(item_id: int):
