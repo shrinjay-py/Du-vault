@@ -83,8 +83,11 @@ init_db()
 PWA_MANIFEST = """{
   "name": "DU PYQ Vault",
   "short_name": "DU Vault",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#E8DDD1",
   "theme_color": "#1E1A17",
   "icons": [
@@ -92,7 +95,13 @@ PWA_MANIFEST = """{
       "src": "/icon.svg",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }"""
@@ -104,7 +113,7 @@ PWA_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" 
   <text x="256" y="365" font-family="sans-serif" font-size="34" letter-spacing="4" font-weight="bold" fill="#1E1A17" text-anchor="middle">VAULT</text>
 </svg>"""
 
-SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v2';
+SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v3';
 const PRECACHE = ['/', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -244,6 +253,36 @@ HTML_TEMPLATE = """
         }
         .container { max-width: 600px; margin: 0 auto; padding: 16px; }
 
+        /* PWA Install Promo Box */
+        .install-box {
+            display: none;
+            background: var(--espresso);
+            color: #FAF6F2;
+            padding: 12px 16px;
+            border-radius: 16px;
+            margin-bottom: 14px;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+        }
+        .install-text {
+            font-size: 0.84rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .install-btn {
+            background: var(--caramel);
+            color: #FAF6F2;
+            border: none;
+            padding: 7px 15px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.78rem;
+            cursor: pointer;
+        }
+
         /* Course Folders Shelf */
         .shelf-label {
             font-size: 0.78rem;
@@ -355,6 +394,12 @@ HTML_TEMPLATE = """
 {admin_banner_html}
 
 <div class="container">
+    <!-- PWA Install Banner -->
+    <div id="pwa-install-banner" class="install-box">
+        <div class="install-text"><span>📲</span> Install DU Vault App</div>
+        <button id="pwa-install-btn" class="install-btn">Install</button>
+    </div>
+
     <div class="shelf-label">Course Folders</div>
     {folder_tiles_html}
 
@@ -444,6 +489,35 @@ HTML_TEMPLATE = """
             navigator.serviceWorker.register('/sw.js', { scope: '/' });
         });
     }
+
+    // Intercept native PWA install prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const banner = document.getElementById('pwa-install-banner');
+        if (banner) banner.style.display = 'flex';
+    });
+
+    const installBtn = document.getElementById('pwa-install-btn');
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    const banner = document.getElementById('pwa-install-banner');
+                    if (banner) banner.style.display = 'none';
+                }
+                deferredPrompt = null;
+            }
+        });
+    }
+
+    window.addEventListener('appinstalled', () => {
+        const banner = document.getElementById('pwa-install-banner');
+        if (banner) banner.style.display = 'none';
+    });
 </script>
 </body>
 </html>
