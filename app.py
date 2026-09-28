@@ -51,10 +51,11 @@ COURSE_TILES = [
     {"name": "B.Sc (Hons) Computer Science", "icon": "💻", "label": "Computer Sci"},
     {"name": "B.Com (Hons)", "icon": "📊", "label": "B.Com (H)"},
     {"name": "B.A. (Hons) Economics", "icon": "📈", "label": "Economics"},
-    {"name": "B.Tech / CIC", "icon": "🧲", "label": "Physical science with chem"}
+    {"name": "B.Sc (prog) Physical science with Chemistry", "icon": "🧲", "label": "Physical science with chem"}
 ]
 
 SEMESTERS = ["All Semesters", "Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 6"]
+CATEGORIES = ["All Types", "DSC", "DSE", "GE", "SEC", "VAC"]
 
 def init_db():
     conn = get_db()
@@ -66,6 +67,7 @@ def init_db():
             course TEXT NOT NULL,
             semester TEXT NOT NULL,
             year TEXT,
+            category TEXT DEFAULT 'DSC',
             type TEXT NOT NULL,
             url_or_name TEXT,
             file_data BLOB,
@@ -73,6 +75,10 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cursor.execute("PRAGMA table_info(du_resources)")
+    cols = [c[1] for c in cursor.fetchall()]
+    if "category" not in cols:
+        cursor.execute("ALTER TABLE du_resources ADD COLUMN category TEXT DEFAULT 'DSC'")
     conn.commit()
     conn.close()
 
@@ -112,7 +118,7 @@ PWA_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" 
   <text x="256" y="365" font-family="sans-serif" font-size="34" letter-spacing="4" font-weight="bold" fill="#1E1A17" text-anchor="middle">VAULT</text>
 </svg>"""
 
-SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v5';
+SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v7';
 const PRECACHE = ['/', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -131,6 +137,18 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  if (e.request.url.includes('/view/')) {
+    e.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cachedResponse = await cache.match(e.request);
+        if (cachedResponse) return cachedResponse;
+        const netResponse = await fetch(e.request);
+        cache.put(e.request, netResponse.clone());
+        return netResponse;
+      })
+    );
+    return;
+  }
   e.respondWith(
     fetch(e.request).catch(async () => {
       const cached = await caches.match(e.request);
@@ -138,6 +156,10 @@ self.addEventListener('fetch', (e) => {
     })
   );
 });"""
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "healthy"}
 
 @app.get("/manifest.json")
 def get_manifest():
@@ -184,6 +206,81 @@ HTML_TEMPLATE = """
             color: var(--text-dark);
             padding-bottom: 90px;
         }
+
+        /* --- Fullscreen Animated Loading Screen --- */
+        #loading-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle at center, #2B231D 0%, #151210 100%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
+        #loading-screen.fade-out {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        .loader-box {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 18px;
+        }
+        .loader-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 3px solid rgba(167, 122, 83, 0.2);
+            border-top: 3px solid var(--caramel);
+            animation: spinRing 1s cubic-bezier(0.55, 0.055, 0.675, 0.19) infinite;
+        }
+        .loader-logo {
+            width: 60px;
+            height: 60px;
+            background: var(--caramel);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #FAF6F2;
+            font-family: 'Georgia', serif;
+            font-weight: bold;
+            font-size: 1.4rem;
+            box-shadow: 0 4px 18px rgba(167, 122, 83, 0.35);
+            animation: pulseLogo 1.6s ease-in-out infinite alternate;
+        }
+        .loader-text {
+            color: #FAF6F2;
+            font-family: 'Georgia', serif;
+            font-size: 1rem;
+            letter-spacing: 1px;
+            opacity: 0.9;
+        }
+        .loader-subtext {
+            color: #A77A53;
+            font-size: 0.72rem;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-top: 6px;
+        }
+        @keyframes spinRing {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes pulseLogo {
+            0% { transform: scale(0.94); filter: brightness(0.95); }
+            100% { transform: scale(1.05); filter: brightness(1.15); }
+        }
+
         header {
             background: var(--espresso);
             color: #FAF6F2;
@@ -263,7 +360,7 @@ HTML_TEMPLATE = """
         }
         .container { max-width: 650px; margin: 0 auto; padding: 16px; }
 
-        /* PWA Install Banner */
+        /* PWA Install Banner & iOS Banner */
         .install-box {
             display: none;
             background: var(--espresso);
@@ -291,6 +388,16 @@ HTML_TEMPLATE = """
             font-weight: 700;
             font-size: 0.78rem;
             cursor: pointer;
+        }
+        .ios-tip {
+            display: none;
+            background: var(--card-foam);
+            border: 1px dashed var(--caramel);
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 0.8rem;
+            margin-bottom: 14px;
+            text-align: center;
         }
 
         /* Course Folder Grid */
@@ -332,7 +439,7 @@ HTML_TEMPLATE = """
             border: 1px solid var(--border-latte);
             border-radius: 16px;
             padding: 14px 18px;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
         .folder-header-title {
             display: flex;
@@ -352,6 +459,33 @@ HTML_TEMPLATE = """
             font-weight: 600;
         }
 
+        /* NEP Category Navigation Bar (DSC, DSE, GE, SEC, VAC) */
+        .nep-pills-bar {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            margin-bottom: 12px;
+            padding-bottom: 2px;
+        }
+        .nep-pills-bar::-webkit-scrollbar { display: none; }
+        .nep-pill {
+            text-decoration: none;
+            background: var(--card-foam);
+            color: var(--text-muted);
+            border: 1px solid var(--border-latte);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .nep-pill.active {
+            background: var(--espresso);
+            color: #FAF6F2;
+            border-color: var(--espresso);
+        }
+
         .search-box input {
             width: 100%; padding: 12px 18px; border-radius: 25px;
             border: 1px solid var(--border-latte); background: var(--card-foam);
@@ -368,7 +502,18 @@ HTML_TEMPLATE = """
             border-radius: 18px; padding: 16px; margin-bottom: 12px;
         }
         .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .badge-row { display: flex; gap: 6px; align-items: center; }
         .badge { font-size: 0.75rem; font-weight: 700; color: var(--caramel); }
+        .category-badge {
+            background: var(--bg-latte);
+            color: var(--espresso);
+            padding: 2px 7px;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+        .admin-actions { display: flex; gap: 8px; align-items: center; }
+        .edit-btn { background: none; border: none; color: var(--caramel); font-size: 0.85rem; cursor: pointer; font-weight: 600; }
         .del-btn { background: none; border: none; color: #BA1A1A; font-size: 1.1rem; cursor: pointer; padding: 0 4px; }
         .card-title { font-family: 'Georgia', serif; font-size: 1.05rem; font-weight: bold; margin-bottom: 6px; }
         .card-meta { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px; }
@@ -408,6 +553,16 @@ HTML_TEMPLATE = """
 </head>
 <body>
 
+<!-- Animated Loading Screen -->
+<div id="loading-screen">
+    <div class="loader-box">
+        <div class="loader-ring"></div>
+        <div class="loader-logo">DU</div>
+    </div>
+    <div class="loader-text">DU PYQ Vault</div>
+    <div class="loader-subtext">Opening Vault...</div>
+</div>
+
 <header>
     <a href="/" class="brand-title">DU VAULT</a>
     <div class="brand-right">
@@ -427,6 +582,10 @@ HTML_TEMPLATE = """
         <button id="pwa-install-btn" class="install-btn">Install</button>
     </div>
 
+    <div id="ios-install-tip" class="ios-tip">
+        📲 <b>To Install on iPhone:</b> Tap the <b>Share icon (⎋)</b> in Safari & choose <b>'Add to Home Screen'</b>.
+    </div>
+
     {main_view_content}
 </div>
 
@@ -436,7 +595,7 @@ HTML_TEMPLATE = """
 <div class="modal" id="uploadModal" onclick="if(event.target === this) closeModal('uploadModal')">
     <div class="modal-content">
         <div class="modal-title">Batch Upload PDFs</div>
-        <form action="/upload" method="POST" enctype="multipart/form-data">
+        <form action="/upload" method="POST" enctype="multipart/form-data" onsubmit="showLoader()">
             <div class="form-group">
                 <label>Course Categorization</label>
                 <select name="course">
@@ -444,6 +603,17 @@ HTML_TEMPLATE = """
                     {upload_course_options}
                 </select>
                 <div class="helper-text">Botany, Zoology, Physics, CS papers auto-sort into their respective folders.</div>
+            </div>
+            <div class="form-group">
+                <label>Paper Type (NEP Category)</label>
+                <select name="category">
+                    <option value="auto">⚡ Auto-Detect (DSC/DSE/GE/SEC/VAC)</option>
+                    <option value="DSC">DSC (Discipline Specific Core)</option>
+                    <option value="DSE">DSE (Discipline Specific Elective)</option>
+                    <option value="GE">GE (Generic Elective)</option>
+                    <option value="SEC">SEC (Skill Enhancement Course)</option>
+                    <option value="VAC">VAC (Value Addition Course)</option>
+                </select>
             </div>
             <div class="form-group">
                 <label>Semester</label>
@@ -475,8 +645,29 @@ HTML_TEMPLATE = """
             <div class="form-group"><label>Title</label><input type="text" name="title" placeholder="e.g. Official Syllabus" required></div>
             <div class="form-group"><label>URL</label><input type="url" name="url" placeholder="https://..." required></div>
             <div class="form-group"><label>Course</label><select name="course" required>{upload_course_options}</select></div>
+            <div class="form-group"><label>Category</label><select name="category">
+                <option value="DSC">DSC</option><option value="DSE">DSE</option><option value="GE">GE</option><option value="SEC">SEC</option><option value="VAC">VAC</option>
+            </select></div>
             <div class="form-group"><label>Semester</label><select name="sem" required>{upload_sem_options}</select></div>
             <button type="submit" class="btn-pill btn-caramel" style="margin-top: 8px;">Save Link</button>
+        </form>
+    </div>
+</div>
+
+<!-- EDIT ITEM MODAL -->
+<div class="modal" id="editModal" onclick="if(event.target === this) closeModal('editModal')">
+    <div class="modal-content">
+        <div class="modal-title">Edit Resource Details</div>
+        <form action="/edit-item" method="POST" onsubmit="showLoader()">
+            <input type="hidden" name="item_id" id="edit_item_id">
+            <div class="form-group"><label>Title</label><input type="text" name="title" id="edit_title" required></div>
+            <div class="form-group"><label>Course</label><select name="course" id="edit_course">{upload_course_options}</select></div>
+            <div class="form-group"><label>NEP Category</label><select name="category" id="edit_category">
+                <option value="DSC">DSC</option><option value="DSE">DSE</option><option value="GE">GE</option><option value="SEC">SEC</option><option value="VAC">VAC</option>
+            </select></div>
+            <div class="form-group"><label>Semester</label><select name="sem" id="edit_sem">{upload_sem_options}</select></div>
+            <div class="form-group"><label>Exam Year</label><input type="text" name="year" id="edit_year" required></div>
+            <button type="submit" class="btn-pill" style="margin-top: 8px;">Save Changes</button>
         </form>
     </div>
 </div>
@@ -498,6 +689,54 @@ HTML_TEMPLATE = """
 <script>
     function openModal(id) { document.getElementById(id).classList.add('active'); }
     function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    function showLoader() {
+        const loader = document.getElementById('loading-screen');
+        if (loader) loader.classList.remove('fade-out');
+    }
+
+    function hideLoader() {
+        const loader = document.getElementById('loading-screen');
+        if (loader) loader.classList.add('fade-out');
+    }
+
+    window.addEventListener('load', () => {
+        setTimeout(hideLoader, 250);
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const triggers = document.querySelectorAll('a.folder-card, a.back-folder-btn, a.nep-pill');
+        triggers.forEach(el => {
+            el.addEventListener('click', (e) => {
+                if (!e.ctrlKey && !e.metaKey && !el.target) {
+                    showLoader();
+                }
+            });
+        });
+    });
+
+    function openEditModal(id, title, course, category, sem, year) {
+        document.getElementById('edit_item_id').value = id;
+        document.getElementById('edit_title').value = title;
+        document.getElementById('edit_course').value = course;
+        document.getElementById('edit_category').value = category;
+        document.getElementById('edit_sem').value = sem;
+        document.getElementById('edit_year').value = year;
+        openModal('editModal');
+    }
+
+    function filterCardsLive(query) {
+        const term = query.toLowerCase().trim();
+        const cards = document.querySelectorAll('.card-item');
+        cards.forEach(card => {
+            const text = card.getAttribute('data-search-text') || '';
+            if (text.includes(term)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
 
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -528,17 +767,19 @@ HTML_TEMPLATE = """
         });
     }
 
-    window.addEventListener('appinstalled', () => {
-        const banner = document.getElementById('pwa-install-banner');
-        if (banner) banner.style.display = 'none';
-    });
+    const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+    const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+    if (isIos() && !isInStandaloneMode()) {
+        const iosTip = document.getElementById('ios-install-tip');
+        if (iosTip) iosTip.style.display = 'block';
+    }
 </script>
 </body>
 </html>
 """
 
-def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallback_year: str):
-    """Auto-detects course, semester, and year from the PDF filename."""
+def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallback_year: str, fallback_cat: str):
+    """Auto-detects course, semester, year, and NEP category from filename."""
     lower = filename.lower()
     
     # 1. Detect Year
@@ -557,7 +798,21 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
         else:
             detected_sem = "Sem 1"
 
-    # 3. Detect Course
+    # 3. Detect NEP Category (DSC, DSE, GE, SEC, VAC)
+    detected_cat = fallback_cat
+    if fallback_cat == "auto":
+        if re.search(r'\bsec\b|skill', lower):
+            detected_cat = "SEC"
+        elif re.search(r'\bvac\b|value', lower):
+            detected_cat = "VAC"
+        elif re.search(r'\bge\b|generic', lower):
+            detected_cat = "GE"
+        elif re.search(r'\bdse\b', lower):
+            detected_cat = "DSE"
+        else:
+            detected_cat = "DSC"
+
+    # 4. Detect Course
     detected_course = fallback_course
     if fallback_course == "auto":
         botany_keywords = [
@@ -582,6 +837,8 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
             detected_course = "B.Sc (Hons) Mathematics"
         elif any(k in lower for k in ["physic", "mechanics", "optics", "electromagnet", "quantum"]):
             detected_course = "B.Sc (Hons) Physics"
+        elif any(k in lower for k in ["physical science", "physical science with chemistry"]):
+            detected_course = "B.Sc (prog) Physical science with Chemistry"
         elif any(k in lower for k in ["chemistry", "organic", "inorganic", "physical chem"]):
             detected_course = "B.Sc (Hons) Chemistry"
         elif "bcom hons" in lower or "b.com (h)" in lower:
@@ -603,15 +860,14 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
 
     base = os.path.splitext(filename)[0]
     clean_title = re.sub(r'_+', ' ', base).strip().title()
-    return clean_title, detected_course, detected_sem, detected_year
+    return clean_title, detected_course, detected_sem, detected_year, detected_cat
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, q: str = "", course: str = "", sem: str = "All Semesters"):
+def index(request: Request, q: str = "", course: str = "", sem: str = "All Semesters", cat: str = "All Types"):
     is_admin = request.cookies.get("du_admin_session") == "authenticated"
     conn = get_db()
     cursor = conn.cursor()
 
-    # Get resource counts per course for folders
     cursor.execute("SELECT course, COUNT(*) FROM du_resources GROUP BY course")
     counts = dict(cursor.fetchall())
 
@@ -644,7 +900,7 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
 
     # SCENARIO 2: INSIDE A SPECIFIC FOLDER OR PERFORMING A GLOBAL SEARCH
     else:
-        query = "SELECT id, title, course, semester, year, type, url_or_name, file_size FROM du_resources WHERE 1=1"
+        query = "SELECT id, title, course, semester, year, category, type, url_or_name, file_size FROM du_resources WHERE 1=1"
         params = []
 
         if course:
@@ -653,6 +909,9 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
         if sem != "All Semesters":
             query += " AND semester = ?"
             params.append(sem)
+        if cat != "All Types":
+            query += " AND category = ?"
+            params.append(cat)
         if q.strip():
             query += " AND (LOWER(title) LIKE ? OR LOWER(course) LIKE ? OR LOWER(year) LIKE ?)"
             wc = f"%{q.strip().lower()}%"
@@ -662,7 +921,6 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
         cursor.execute(query, tuple(params))
         records = cursor.fetchall()
 
-        # Find Icon for folder header
         matched_tile = next((t for t in COURSE_TILES if t["name"] == course), None)
         folder_icon = matched_tile["icon"] if matched_tile else "📁"
         folder_display_name = matched_tile["label"] if matched_tile else (course or f"Search: '{q}'")
@@ -677,11 +935,19 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
         </div>
         """
 
+        pills_html = '<div class="nep-pills-bar">'
+        encoded_curr_course = urllib.parse.quote_plus(course) if course else ""
+        for c_type in CATEGORIES:
+            is_active = "active" if c_type == cat else ""
+            pills_html += f'<a href="/?course={encoded_curr_course}&sem={urllib.parse.quote_plus(sem)}&cat={c_type}" class="nep-pill {is_active}">{c_type}</a>'
+        pills_html += '</div>'
+
         search_filter_form = f"""
         <form method="GET" action="/">
             <input type="hidden" name="course" value="{course}">
+            <input type="hidden" name="cat" value="{cat}">
             <div class="search-box">
-                <input type="text" name="q" value="{q}" placeholder="🔍 Search inside this folder..." onchange="this.form.submit()">
+                <input type="text" name="q" value="{q}" placeholder="⚡ Live search in this folder..." onkeyup="filterCardsLive(this.value)">
             </div>
             <div class="filters">
                 <select name="sem" onchange="this.form.submit()">{ "".join(f'<option value="{s}" {"selected" if s == sem else ""}>{s}</option>' for s in SEMESTERS) }</select>
@@ -691,9 +957,9 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
 
         cards_html = ""
         if not records:
-            cards_html = f'<div class="card" style="text-align:center; padding:36px;"><p style="color:var(--text-muted);">No papers found inside this folder.</p></div>'
+            cards_html = f'<div class="card" style="text-align:center; padding:36px;"><p style="color:var(--text-muted);">No papers found inside this category/folder.</p></div>'
         else:
-            for item_id, title, c, s, y, r_type, url_or_name, size in records:
+            for item_id, title, c, s, y, c_cat, r_type, url_or_name, size in records:
                 if r_type == "pdf":
                     action_btn = f"""
                     <div style="display: flex; gap: 8px; margin-top: 8px;">
@@ -704,19 +970,30 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
                 else:
                     action_btn = f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
 
-                del_form = ""
+                admin_opts = ""
                 if is_admin:
-                    del_form = f"""
-                    <form action="/delete/{item_id}" method="POST" onsubmit="return confirm('Delete paper?');">
-                        <button type="submit" class="del-btn">✕</button>
-                    </form>
+                    safe_title = title.replace("'", "\\'")
+                    safe_c = c.replace("'", "\\'")
+                    safe_cat = (c_cat or 'DSC').replace("'", "\\'")
+                    admin_opts = f"""
+                    <div class="admin-actions">
+                        <button class="edit-btn" onclick="openEditModal({item_id}, '{safe_title}', '{safe_c}', '{safe_cat}', '{s}', '{y}')">✎ Edit</button>
+                        <form action="/delete/{item_id}" method="POST" onsubmit="return confirm('Delete paper?');">
+                            <button type="submit" class="del-btn">✕</button>
+                        </form>
+                    </div>
                     """
 
+                card_search_data = f"{title.lower()} {c.lower()} {s.lower()} {y.lower()} {(c_cat or '').lower()}"
+
                 cards_html += f"""
-                <div class="card">
+                <div class="card card-item" data-search-text="{card_search_data}">
                     <div class="card-top">
-                        <span class="badge">{c}</span>
-                        {del_form}
+                        <div class="badge-row">
+                            <span class="category-badge">{c_cat or 'DSC'}</span>
+                            <span class="badge">{c}</span>
+                        </div>
+                        {admin_opts}
                     </div>
                     <div class="card-title">{title}</div>
                     <div class="card-meta">🎓 {s} &nbsp;•&nbsp; 📅 {y} &nbsp;•&nbsp; 💾 {size}</div>
@@ -724,7 +1001,7 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
                 </div>
                 """
 
-        main_view_content = header_bar + search_filter_form + cards_html
+        main_view_content = header_bar + pills_html + search_filter_form + f'<div id="cards-container">{cards_html}</div>'
 
     conn.close()
 
@@ -773,6 +1050,7 @@ def logout():
 async def upload_files(
     request: Request,
     course: str = Form("auto"),
+    category: str = Form("auto"),
     sem: str = Form("auto"),
     year: str = Form(""),
     files: list[UploadFile] = File(...)
@@ -787,19 +1065,44 @@ async def upload_files(
         if file.filename.lower().endswith(".pdf"):
             data = await file.read()
             size_mb = f"{len(data) / (1024 * 1024):.2f} MB"
-            clean_title, detected_course, detected_sem, detected_year = parse_filename(
-                file.filename, course, sem, year
+            clean_title, detected_course, detected_sem, detected_year, detected_cat = parse_filename(
+                file.filename, course, sem, year, category
             )
             last_detected_course = detected_course
             cursor.execute("""
-                INSERT INTO du_resources (title, course, semester, year, type, url_or_name, file_data, file_size)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (clean_title, detected_course, detected_sem, detected_year, "pdf", file.filename, data, size_mb))
+                INSERT INTO du_resources (title, course, semester, year, category, type, url_or_name, file_data, file_size)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (clean_title, detected_course, detected_sem, detected_year, detected_cat, "pdf", file.filename, data, size_mb))
     conn.commit()
     conn.close()
 
     redirect_url = f"/?course={urllib.parse.quote_plus(last_detected_course)}" if last_detected_course else "/"
     return RedirectResponse(url=redirect_url, status_code=303)
+
+@app.post("/edit-item")
+def edit_item(
+    request: Request,
+    item_id: int = Form(...),
+    title: str = Form(...),
+    course: str = Form(...),
+    category: str = Form(...),
+    sem: str = Form(...),
+    year: str = Form(...)
+):
+    if request.cookies.get("du_admin_session") != "authenticated":
+        return HTMLResponse("Unauthorized.", status_code=403)
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE du_resources
+        SET title = ?, course = ?, category = ?, semester = ?, year = ?
+        WHERE id = ?
+    """, (title, course, category, sem, year, item_id))
+    conn.commit()
+    conn.close()
+
+    return RedirectResponse(url=f"/?course={urllib.parse.quote_plus(course)}", status_code=303)
 
 @app.post("/add-link")
 def add_link(
@@ -807,6 +1110,7 @@ def add_link(
     title: str = Form(...),
     url: str = Form(...),
     course: str = Form(...),
+    category: str = Form("DSC"),
     sem: str = Form(...)
 ):
     if request.cookies.get("du_admin_session") != "authenticated":
@@ -815,9 +1119,9 @@ def add_link(
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO du_resources (title, course, semester, year, type, url_or_name, file_data, file_size)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (title, course, sem, "Web", "link", url, None, "Link"))
+        INSERT INTO du_resources (title, course, semester, year, category, type, url_or_name, file_data, file_size)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (title, course, sem, "Web", category, "link", url, None, "Link"))
     conn.commit()
     conn.close()
     return RedirectResponse(url=f"/?course={urllib.parse.quote_plus(course)}", status_code=303)
