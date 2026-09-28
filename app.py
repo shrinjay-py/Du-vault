@@ -51,7 +51,7 @@ COURSE_TILES = [
     {"name": "B.Sc (Hons) Computer Science", "icon": "💻", "label": "Computer Sci"},
     {"name": "B.Com (Hons)", "icon": "📊", "label": "B.Com (H)"},
     {"name": "B.A. (Hons) Economics", "icon": "📈", "label": "Economics"},
-    {"name": "B.Tech / CIC", "icon": "⚙️", "label": "CIC / B.Tech"}
+    {"name": "B.Tech / CIC", "icon": "🧲", "label": "Physical science with chem"}
 ]
 
 SEMESTERS = ["All Semesters", "Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 6"]
