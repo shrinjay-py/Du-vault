@@ -465,17 +465,25 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
         cards_html = '<div class="card" style="text-align:center; padding:30px;"><p style="color:var(--text-muted);">No question papers found.</p></div>'
     else:
         for item_id, title, c, s, y, r_type, url_or_name, size in records:
-            action_btn  = f'<a class="btn-pill" href="/download/{item_id}" download>📥 Download PDF</a>' if r_type == "pdf" else f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
+          if r_type == "pdf":
+    action_btn = f"""
+    <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <a class="btn-pill" href="/view/{item_id}" target="_blank" style="flex: 1; text-align: center;">👁️ View</a>
+        <a class="btn-pill btn-caramel" href="/download/{item_id}" style="flex: 1; text-align: center;">📥 Save</a>
+    </div>
+    """
+else:
+    action_btn = f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
             
             # Show delete button only if logged in as Admin
-            del_form = ""
+            del_form = ""                                
             if is_admin:
                 del_form = f"""
                 <form action="/delete/{item_id}" method="POST" onsubmit="return confirm('Delete paper?');">
                     <button type="submit" class="del-btn">✕</button>
                 </form>
                 """
-
+                                                                                                                                                                                                                                
             cards_html += f"""
             <div class="card">
                 <div class="card-top">
@@ -595,6 +603,20 @@ def download_pdf(item_id: int):
             io.BytesIO(row[1]),
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{row[0]}.pdf"'}
+        )
+    return HTMLResponse("Not Found", status_code=404) 
+    @app.get("/view/{item_id}")
+def view_pdf(item_id: int):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT title, file_data FROM du_resources WHERE id = ?", (item_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row and row[1]:
+        return StreamingResponse(
+            io.BytesIO(row[1]),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="{row[0]}.pdf"'}
         )
     return HTMLResponse("Not Found", status_code=404)
 
