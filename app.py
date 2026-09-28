@@ -1,25 +1,24 @@
 import os
-import libsql_experimental as sqlite3
 import io
 import re
+import urllib.parse
+import libsql_experimental as sqlite3
 from fastapi import FastAPI, UploadFile, File, Form, Response, Request
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
+from fastapi.middleware.gzip import GZipMiddleware
 
 app = FastAPI(title="DU PYQ Vault")
-DB_FILE = "du_pyq_vault.db"
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 TURSO_DB_URL = os.getenv("TURSO_DB_URL")
 TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
 def get_db():
     if TURSO_DB_URL and TURSO_AUTH_TOKEN:
-        print("[DB STATUS] Connecting to TURSO CLOUD DB...")
         return sqlite3.connect(TURSO_DB_URL, auth_token=TURSO_AUTH_TOKEN)
     else:
-        print("[DB WARNING] Missing Turso credentials! Falling back to EPHEMERAL local disk.")
         return sqlite3.connect("du_pyq_vault.db")
-
-# --- CONFIGURATION ---
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
 COURSES = [
     "All Courses",
@@ -113,7 +112,7 @@ PWA_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" 
   <text x="256" y="365" font-family="sans-serif" font-size="34" letter-spacing="4" font-weight="bold" fill="#1E1A17" text-anchor="middle">VAULT</text>
 </svg>"""
 
-SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v3';
+SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v4';
 const PRECACHE = ['/', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -209,21 +208,32 @@ HTML_TEMPLATE = """
         }
         .founder-tag {
             font-family: 'Georgia', serif;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             color: #FAF6F2;
             opacity: 0.95;
-            text-align: right;
-            line-height: 1.25;
+            text-align: center;
+            line-height: 1.15;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        .founder-tag span {
+        .founder-tag span.founder-name {
             color: var(--caramel);
-            font-weight: 600;
+            font-weight: 700;
+            font-size: 0.95rem;
+            letter-spacing: 0.3px;
         }
         .college-subtag {
-            font-size: 0.72rem;
-            color: #D8C7B6;
+            font-size: 0.48rem;
+            color: #BFA898;
             font-family: 'Inter', sans-serif;
+            font-weight: 500;
             font-style: normal;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            text-align: center;
+            margin-top: 2px;
+            opacity: 0.8;
             display: block;
         }
         .admin-lock-btn {
@@ -253,7 +263,7 @@ HTML_TEMPLATE = """
         }
         .container { max-width: 600px; margin: 0 auto; padding: 16px; }
 
-        /* PWA Install Promo Box */
+        /* PWA Install Banner */
         .install-box {
             display: none;
             background: var(--espresso);
@@ -314,15 +324,40 @@ HTML_TEMPLATE = """
             align-items: center;
             min-width: 84px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-            transition: transform 0.15s ease, background 0.15s ease;
+            transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
         }
         .folder-chip:active { transform: scale(0.96); }
         .folder-chip.active {
             border: 2px solid var(--caramel);
             background: #F4EAE0;
+            font-weight: 700;
         }
         .folder-icon { font-size: 1.5rem; margin-bottom: 4px; }
         .folder-name { font-size: 0.72rem; font-weight: 600; text-align: center; white-space: nowrap; }
+
+        /* Active Directory Indicator */
+        .directory-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--card-foam);
+            border: 1px solid var(--border-latte);
+            border-left: 4px solid var(--caramel);
+            border-radius: 12px;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+        }
+        .directory-indicator span {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+        .clear-filter-btn {
+            font-size: 0.78rem;
+            color: #BA1A1A;
+            text-decoration: none;
+            font-weight: 600;
+        }
 
         .search-box input {
             width: 100%; padding: 12px 18px; border-radius: 25px;
@@ -384,7 +419,7 @@ HTML_TEMPLATE = """
     <a href="/" class="brand-title">DU VAULT</a>
     <div class="brand-right">
         <div class="founder-tag">
-            Founded by <span>Shrinjay Raj</span>
+            <div>Founded by <span class="founder-name">Shrinjay Raj</span></div>
             <span class="college-subtag">(Hansraj College)</span>
         </div>
         {admin_header_btn}
@@ -394,7 +429,6 @@ HTML_TEMPLATE = """
 {admin_banner_html}
 
 <div class="container">
-    <!-- PWA Install Banner -->
     <div id="pwa-install-banner" class="install-box">
         <div class="install-text"><span>📲</span> Install DU Vault App</div>
         <button id="pwa-install-btn" class="install-btn">Install</button>
@@ -403,12 +437,14 @@ HTML_TEMPLATE = """
     <div class="shelf-label">Course Folders</div>
     {folder_tiles_html}
 
+    {active_directory_banner}
+
     <form method="GET" action="/">
+        <input type="hidden" name="course" value="{course_val}">
         <div class="search-box">
-            <input type="text" name="q" value="{query}" placeholder="🔍 Search papers or subjects..." onchange="this.form.submit()">
+            <input type="text" name="q" value="{query}" placeholder="🔍 Search in this folder..." onchange="this.form.submit()">
         </div>
         <div class="filters">
-            <select name="course" onchange="this.form.submit()">{course_options}</select>
             <select name="sem" onchange="this.form.submit()">{sem_options}</select>
         </div>
     </form>
@@ -428,7 +464,7 @@ HTML_TEMPLATE = """
                     <option value="auto">⚡ Auto-Detect from Filename</option>
                     {upload_course_options}
                 </select>
-                <div class="helper-text">Leave on Auto-Detect to sort CS, Maths, Botany, etc. automatically.</div>
+                <div class="helper-text">Botany, Zoology, Physics, CS papers auto-sort into their respective folders.</div>
             </div>
             <div class="form-group">
                 <label>Semester</label>
@@ -490,7 +526,6 @@ HTML_TEMPLATE = """
         });
     }
 
-    // Intercept native PWA install prompt
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
@@ -527,13 +562,13 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
     """Auto-detects course, semester, and year from the PDF filename."""
     lower = filename.lower()
     
-    # 1. Detect Year (e.g. 2018, 2022, 2024)
+    # 1. Detect Year
     detected_year = fallback_year.strip() if fallback_year.strip() else None
     if not detected_year:
         year_match = re.search(r'\b(20[1-2][0-9])\b', lower)
         detected_year = year_match.group(1) if year_match else "2024"
 
-    # 2. Detect Semester (e.g. sem 3, semester 4, sem-2, s5)
+    # 2. Detect Semester
     detected_sem = fallback_sem
     if fallback_sem == "auto":
         sem_match = re.search(r'(?:sem(?:ester)?[\s_-]*([1-6])|\bs([1-6])\b)', lower)
@@ -543,22 +578,32 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
         else:
             detected_sem = "Sem 1"
 
-    # 3. Detect Course
+    # 3. Detect Course (Expanded for Botany and major programs)
     detected_course = fallback_course
     if fallback_course == "auto":
-        if "botany" in lower or "plant" in lower:
+        botany_keywords = [
+            "botany", "plant", "archegoniate", "bryophyte", "pteridophyte", 
+            "gymnosperm", "angiosperm", "algae", "microbiology", "mycology", 
+            "phytopathology", "plant physiology", "plant metabolism", "plant ecology"
+        ]
+        zoology_keywords = [
+            "zoology", "animal", "chordata", "non-chordata", "physiology", 
+            "developmental biology", "genetics", "evolution"
+        ]
+        
+        if any(k in lower for k in botany_keywords):
             detected_course = "B.Sc (Hons) Botany"
-        elif "zoology" in lower or "animal" in lower:
+        elif any(k in lower for k in zoology_keywords):
             detected_course = "B.Sc (Hons) Zoology"
         elif "life science" in lower or "life-science" in lower:
             detected_course = "B.Sc (prog) Life Sciences"
-        elif any(k in lower for k in ["cs", "computer", "c++", "python", "algorithm"]):
+        elif any(k in lower for k in ["cs", "computer", "c++", "python", "algorithm", "data structure", "dbms", "os"]):
             detected_course = "B.Sc (Hons) Computer Science"
-        elif any(k in lower for k in ["math", "calculus", "algebra"]):
+        elif any(k in lower for k in ["math", "calculus", "algebra", "differential", "real analysis"]):
             detected_course = "B.Sc (Hons) Mathematics"
-        elif any(k in lower for k in ["physic", "mechanics", "optics"]):
+        elif any(k in lower for k in ["physic", "mechanics", "optics", "electromagnet", "quantum"]):
             detected_course = "B.Sc (Hons) Physics"
-        elif "chemistry" in lower:
+        elif any(k in lower for k in ["chemistry", "organic", "inorganic", "physical chem"]):
             detected_course = "B.Sc (Hons) Chemistry"
         elif "bcom hons" in lower or "b.com (h)" in lower:
             detected_course = "B.Com (Hons)"
@@ -566,9 +611,9 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
             detected_course = "B.Com (Programme)"
         elif "econ" in lower or "macro" in lower or "micro" in lower:
             detected_course = "B.A. (Hons) Economics"
-        elif "english" in lower:
+        elif "english" in lower or "literature" in lower:
             detected_course = "B.A. (Hons) English"
-        elif any(k in lower for k in ["pol", "constitution", "governance"]):
+        elif any(k in lower for k in ["pol", "constitution", "governance", "political science"]):
             detected_course = "B.A. (Hons) Political Science"
         elif "ba prog" in lower or "b.a prog" in lower:
             detected_course = "B.A. Programme"
@@ -577,7 +622,6 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
         else:
             detected_course = "General / Other"
 
-    # Clean title keeping dash (-) visible, only replacing underscores
     base = os.path.splitext(filename)[0]
     clean_title = re.sub(r'_+', ' ', base).strip().title()
     return clean_title, detected_course, detected_sem, detected_year
@@ -609,7 +653,7 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
 
     cards_html = ""
     if not records:
-        cards_html = '<div class="card" style="text-align:center; padding:30px;"><p style="color:var(--text-muted);">No question papers found.</p></div>'
+        cards_html = f'<div class="card" style="text-align:center; padding:32px;"><p style="color:var(--text-muted); font-size:0.9rem;">No papers found in <b>{course}</b>.</p></div>'
     else:
         for item_id, title, c, s, y, r_type, url_or_name, size in records:
             if r_type == "pdf":
@@ -642,16 +686,26 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
             </div>
             """
 
-    # Generate Course Folder Horizontal Shelf
+    # Horizontal Folder Chips
     folder_tiles_html = '<div class="folder-scroll">'
     all_active = "active" if course == "All Courses" else ""
-    folder_tiles_html += f'<a href="/?course=All Courses&sem={sem}&q={q}" class="folder-chip {all_active}"><div class="folder-icon">📂</div><div class="folder-name">All</div></a>'
+    folder_tiles_html += f'<a href="/?course=All+Courses" class="folder-chip {all_active}"><div class="folder-icon">📂</div><div class="folder-name">All</div></a>'
     for tile in COURSE_TILES:
         is_active = "active" if tile["name"] == course else ""
-        folder_tiles_html += f'<a href="/?course={tile["name"]}&sem={sem}&q={q}" class="folder-chip {is_active}"><div class="folder-icon">{tile["icon"]}</div><div class="folder-name">{tile["label"]}</div></a>'
+        encoded_c = urllib.parse.quote_plus(tile["name"])
+        folder_tiles_html += f'<a href="/?course={encoded_c}" class="folder-chip {is_active}"><div class="folder-icon">{tile["icon"]}</div><div class="folder-name">{tile["label"]}</div></a>'
     folder_tiles_html += '</div>'
 
-    course_opts = "".join(f'<option value="{c}" {"selected" if c == course else ""}>{c}</option>' for c in COURSES)
+    # Directory Indicator Banner
+    active_directory_banner = ""
+    if course != "All Courses":
+        active_directory_banner = f"""
+        <div class="directory-indicator">
+            <span>📁 Showing folder: <b>{course}</b> ({len(records)} papers)</span>
+            <a href="/?course=All+Courses" class="clear-filter-btn">✕ Clear folder filter</a>
+        </div>
+        """
+
     sem_opts = "".join(f'<option value="{s}" {"selected" if s == sem else ""}>{s}</option>' for s in SEMESTERS)
     up_course_opts = "".join(f'<option value="{c}">{c}</option>' for c in COURSES[1:])
     up_sem_opts = "".join(f'<option value="{s}">{s}</option>' for s in SEMESTERS[1:])
@@ -672,8 +726,9 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
 
     content = HTML_TEMPLATE
     content = content.replace("{query}", q)
+    content = content.replace("{course_val}", course)
     content = content.replace("{folder_tiles_html}", folder_tiles_html)
-    content = content.replace("{course_options}", course_opts)
+    content = content.replace("{active_directory_banner}", active_directory_banner)
     content = content.replace("{sem_options}", sem_opts)
     content = content.replace("{upload_course_options}", up_course_opts)
     content = content.replace("{upload_sem_options}", up_sem_opts)
@@ -758,7 +813,11 @@ def download_pdf(item_id: int):
         return StreamingResponse(
             io.BytesIO(row[1]),
             media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="{row[0]}.pdf"'}
+            headers={
+                "Content-Disposition": f'attachment; filename="{row[0]}.pdf"',
+                "X-Content-Type-Options": "nosniff",
+                "Cache-Control": "public, max-age=604800, immutable"
+            }
         )
     return HTMLResponse("Not Found", status_code=404)
 
@@ -773,7 +832,11 @@ def view_pdf(item_id: int):
         return StreamingResponse(
             io.BytesIO(row[1]),
             media_type="application/pdf",
-            headers={"Content-Disposition": f'inline; filename="{row[0]}.pdf"'}
+            headers={
+                "Content-Disposition": f'inline; filename="{row[0]}.pdf"',
+                "X-Content-Type-Options": "nosniff",
+                "Cache-Control": "public, max-age=604800, immutable"
+            }
         )
     return HTMLResponse("Not Found", status_code=404)
 
