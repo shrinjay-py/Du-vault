@@ -476,8 +476,8 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
               action_btn = f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
             
             # Show delete button only if logged in as Admin
-            del_form = ""                                
-            if is_admin:
+          del_form = ""                                
+          if is_admin:
                 del_form = f"""
                 <form action="/delete/{item_id}" method="POST" onsubmit="return confirm('Delete paper?');">
                     <button type="submit" class="del-btn">✕</button>
