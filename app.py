@@ -470,10 +470,10 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
               <div style="display: flex; gap: 8px; margin-top: 8px;">
                  <a class="btn-pill" href="/view/{item_id}" target="_blank" style="flex: 1; text-align: center;">👁️ View</a>
                  <a class="btn-pill btn-caramel" href="/download/{item_id}" style="flex: 1; text-align: center;">📥 Save</a>
-    </div>
-    """
-else:
-    action_btn = f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
+             </div>
+             """
+         else:
+              action_btn = f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
             
             # Show delete button only if logged in as Admin
             del_form = ""                                
