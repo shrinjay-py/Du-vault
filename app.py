@@ -13,20 +13,21 @@ TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
 def get_db():
     if TURSO_DB_URL and TURSO_AUTH_TOKEN:
         return sqlite3.connect(TURSO_DB_URL, auth_token=TURSO_AUTH_TOKEN)
-    return sqlite3.connect("du_pyq_vault.db") 
+    return sqlite3.connect("du_pyq_vault.db")
 
 # --- CONFIGURATION ---
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")  # Change this to your chosen password
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
 COURSES = [
     "All Courses",
-    "B.Sc (Hons) Computer Science",
     "B.Sc (Hons) Botany",
     "B.Sc (Hons) Zoology",
+    "B.Sc (prog) Life Sciences",
     "B.Sc (Hons) Chemistry",
     "B.Sc (prog) Physical science with Chemistry",
     "B.Sc (Hons) Mathematics",
     "B.Sc (Hons) Physics",
+    "B.Sc (Hons) Computer Science",
     "B.Com (Hons)",
     "B.Com (Programme)",
     "B.A. (Hons) Economics",
@@ -36,6 +37,19 @@ COURSES = [
     "B.Tech / CIC",
     "Postgraduate",
     "General / Other"
+]
+
+COURSE_TILES = [
+    {"name": "B.Sc (Hons) Botany", "icon": "🌿", "label": "Botany"},
+    {"name": "B.Sc (Hons) Zoology", "icon": "🦁", "label": "Zoology"},
+    {"name": "B.Sc (prog) Life Sciences", "icon": "🧬", "label": "Life Science"},
+    {"name": "B.Sc (Hons) Chemistry", "icon": "🧪", "label": "Chemistry"},
+    {"name": "B.Sc (Hons) Mathematics", "icon": "📐", "label": "Mathematics"},
+    {"name": "B.Sc (Hons) Physics", "icon": "⚛️", "label": "Physics"},
+    {"name": "B.Sc (Hons) Computer Science", "icon": "💻", "label": "Computer Sci"},
+    {"name": "B.Com (Hons)", "icon": "📊", "label": "B.Com (H)"},
+    {"name": "B.A. (Hons) Economics", "icon": "📈", "label": "Economics"},
+    {"name": "B.Tech / CIC", "icon": "⚙️", "label": "CIC / B.Tech"}
 ]
 
 SEMESTERS = ["All Semesters", "Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 6"]
@@ -173,6 +187,8 @@ HTML_TEMPLATE = """
             font-size: 1.15rem; 
             font-weight: bold; 
             letter-spacing: 0.5px;
+            text-decoration: none;
+            color: #FAF6F2;
         }
         .brand-right {
             display: flex;
@@ -206,6 +222,7 @@ HTML_TEMPLATE = """
             padding: 4px 8px;
             font-size: 0.75rem;
             cursor: pointer;
+            text-decoration: none;
         }
         .admin-banner {
             background: #D4A373;
@@ -223,6 +240,48 @@ HTML_TEMPLATE = """
             cursor: pointer;
         }
         .container { max-width: 600px; margin: 0 auto; padding: 16px; }
+
+        /* Course Folders Shelf */
+        .shelf-label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin: 4px 0 8px 2px;
+        }
+        .folder-scroll {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 2px 2px 14px 2px;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+        }
+        .folder-scroll::-webkit-scrollbar { display: none; }
+        .folder-chip {
+            flex: 0 0 auto;
+            text-decoration: none;
+            color: var(--text-dark);
+            background: var(--card-foam);
+            border: 1px solid var(--border-latte);
+            border-radius: 16px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 84px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            transition: transform 0.15s ease, background 0.15s ease;
+        }
+        .folder-chip:active { transform: scale(0.96); }
+        .folder-chip.active {
+            border: 2px solid var(--caramel);
+            background: #F4EAE0;
+        }
+        .folder-icon { font-size: 1.5rem; margin-bottom: 4px; }
+        .folder-name { font-size: 0.72rem; font-weight: 600; text-align: center; white-space: nowrap; }
+
         .search-box input {
             width: 100%; padding: 12px 18px; border-radius: 25px;
             border: 1px solid var(--border-latte); background: var(--card-foam);
@@ -280,7 +339,7 @@ HTML_TEMPLATE = """
 <body>
 
 <header>
-    <div class="brand-title">DU VAULT</div>
+    <a href="/" class="brand-title">DU VAULT</a>
     <div class="brand-right">
         <div class="founder-tag">
             Founded by <span>Shrinjay Raj</span>
@@ -293,6 +352,9 @@ HTML_TEMPLATE = """
 {admin_banner_html}
 
 <div class="container">
+    <div class="shelf-label">Course Folders</div>
+    {folder_tiles_html}
+
     <form method="GET" action="/">
         <div class="search-box">
             <input type="text" name="q" value="{query}" placeholder="🔍 Search papers or subjects..." onchange="this.form.submit()">
@@ -318,7 +380,7 @@ HTML_TEMPLATE = """
                     <option value="auto">⚡ Auto-Detect from Filename</option>
                     {upload_course_options}
                 </select>
-                <div class="helper-text">Leave on Auto-Detect to sort CS, Maths, Econ, etc. automatically.</div>
+                <div class="helper-text">Leave on Auto-Detect to sort CS, Maths, Botany, etc. automatically.</div>
             </div>
             <div class="form-group">
                 <label>Semester</label>
@@ -407,12 +469,20 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
     # 3. Detect Course
     detected_course = fallback_course
     if fallback_course == "auto":
-        if any(k in lower for k in ["cs", "computer", "c++", "python", "algorithm"]):
+        if "botany" in lower or "plant" in lower:
+            detected_course = "B.Sc (Hons) Botany"
+        elif "zoology" in lower or "animal" in lower:
+            detected_course = "B.Sc (Hons) Zoology"
+        elif "life science" in lower or "life-science" in lower:
+            detected_course = "B.Sc (prog) Life Sciences"
+        elif any(k in lower for k in ["cs", "computer", "c++", "python", "algorithm"]):
             detected_course = "B.Sc (Hons) Computer Science"
         elif any(k in lower for k in ["math", "calculus", "algebra"]):
             detected_course = "B.Sc (Hons) Mathematics"
         elif any(k in lower for k in ["physic", "mechanics", "optics"]):
             detected_course = "B.Sc (Hons) Physics"
+        elif "chemistry" in lower:
+            detected_course = "B.Sc (Hons) Chemistry"
         elif "bcom hons" in lower or "b.com (h)" in lower:
             detected_course = "B.Com (Hons)"
         elif "bcom" in lower or "b.com" in lower:
@@ -430,9 +500,9 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
         else:
             detected_course = "General / Other"
 
-    # Clean title
+    # Clean title keeping dash (-) visible, only replacing underscores
     base = os.path.splitext(filename)[0]
-    clean_title = re.sub(r'[\-_]', ' ', base).title()
+    clean_title = re.sub(r'_+', ' ', base).strip().title()
     return clean_title, detected_course, detected_sem, detected_year
 
 @app.get("/", response_class=HTMLResponse)
@@ -465,25 +535,24 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
         cards_html = '<div class="card" style="text-align:center; padding:30px;"><p style="color:var(--text-muted);">No question papers found.</p></div>'
     else:
         for item_id, title, c, s, y, r_type, url_or_name, size in records:
-          if r_type == "pdf":
-              action_btn = f"""
-              <div style="display: flex; gap: 8px; margin-top: 8px;">
-                 <a class="btn-pill" href="/view/{item_id}" target="_blank" style="flex: 1; text-align: center;">👁️ View</a>
-                 <a class="btn-pill btn-caramel" href="/download/{item_id}" style="flex: 1; text-align: center;">📥 Save</a>
-             </div>
-             """
-          else:
-              action_btn = f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
-            
-            # Show delete button only if logged in as Admin
-          del_form = ""                                
-          if is_admin:
+            if r_type == "pdf":
+                action_btn = f"""
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <a class="btn-pill" href="/view/{item_id}" target="_blank" style="flex: 1; text-align: center;">👁️ View</a>
+                    <a class="btn-pill btn-caramel" href="/download/{item_id}" style="flex: 1; text-align: center;">📥 Save</a>
+                </div>
+                """
+            else:
+                action_btn = f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a>'
+
+            del_form = ""
+            if is_admin:
                 del_form = f"""
                 <form action="/delete/{item_id}" method="POST" onsubmit="return confirm('Delete paper?');">
                     <button type="submit" class="del-btn">✕</button>
                 </form>
                 """
-                                                                                                                                                                                                                                
+
             cards_html += f"""
             <div class="card">
                 <div class="card-top">
@@ -496,12 +565,20 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
             </div>
             """
 
+    # Generate Course Folder Horizontal Shelf
+    folder_tiles_html = '<div class="folder-scroll">'
+    all_active = "active" if course == "All Courses" else ""
+    folder_tiles_html += f'<a href="/?course=All Courses&sem={sem}&q={q}" class="folder-chip {all_active}"><div class="folder-icon">📂</div><div class="folder-name">All</div></a>'
+    for tile in COURSE_TILES:
+        is_active = "active" if tile["name"] == course else ""
+        folder_tiles_html += f'<a href="/?course={tile["name"]}&sem={sem}&q={q}" class="folder-chip {is_active}"><div class="folder-icon">{tile["icon"]}</div><div class="folder-name">{tile["label"]}</div></a>'
+    folder_tiles_html += '</div>'
+
     course_opts = "".join(f'<option value="{c}" {"selected" if c == course else ""}>{c}</option>' for c in COURSES)
     sem_opts = "".join(f'<option value="{s}" {"selected" if s == sem else ""}>{s}</option>' for s in SEMESTERS)
     up_course_opts = "".join(f'<option value="{c}">{c}</option>' for c in COURSES[1:])
     up_sem_opts = "".join(f'<option value="{s}">{s}</option>' for s in SEMESTERS[1:])
 
-    # UI conditional on admin status
     if is_admin:
         admin_header_btn = '<a href="/logout" class="admin-lock-btn">Logout</a>'
         admin_banner_html = '<div class="admin-banner"><span>🔓 Host Controls Unlocked</span><a href="/logout">Lock</a></div>'
@@ -518,6 +595,7 @@ def index(request: Request, q: str = "", course: str = "All Courses", sem: str =
 
     content = HTML_TEMPLATE
     content = content.replace("{query}", q)
+    content = content.replace("{folder_tiles_html}", folder_tiles_html)
     content = content.replace("{course_options}", course_opts)
     content = content.replace("{sem_options}", sem_opts)
     content = content.replace("{upload_course_options}", up_course_opts)
@@ -536,6 +614,7 @@ def login(password: str = Form(...)):
         response.set_cookie(key="du_admin_session", value="authenticated", httponly=True)
         return response
     return HTMLResponse("Invalid Password", status_code=401)
+
 @app.get("/logout")
 def logout():
     response = RedirectResponse(url="/", status_code=303)
@@ -604,8 +683,9 @@ def download_pdf(item_id: int):
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{row[0]}.pdf"'}
         )
-    return HTMLResponse("Not Found", status_code=404) 
-    @app.get("/view/{item_id}")
+    return HTMLResponse("Not Found", status_code=404)
+
+@app.get("/view/{item_id}")
 def view_pdf(item_id: int):
     conn = get_db()
     cursor = conn.cursor()
