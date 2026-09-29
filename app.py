@@ -963,8 +963,8 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
                 if r_type == "pdf":
                     action_btn = f"""
                     <div style="display: flex; gap: 8px; margin-top: 8px;">
-                        <a class="btn-pill" href="/view/{item_id}" target="_blank" style="flex: 1; text-align: center;">👁️ View</a>
-                        <a class="btn-pill btn-caramel" href="/download/{item_id}" style="flex: 1; text-align: center;">📥 Save</a>
+                        <a class="btn-pill" href="/view/{item_id}" target="_blank" style="flex: 1; text-align: center;"> View</a>
+                        <a class="btn-pill btn-caramel" href="/download/{item_id}" style="flex: 1; text-align: center;"> Save</a>
                     </div>
                     """
                 else:
