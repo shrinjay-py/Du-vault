@@ -112,8 +112,14 @@ PWA_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" 
   <text x="256" y="365" font-family="sans-serif" font-size="34" letter-spacing="4" font-weight="bold" fill="#1E1A17" text-anchor="middle">VAULT</text>
 </svg>"""
 
-SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v10';
-const PRECACHE = ['/', '/manifest.json', '/icon.svg'];
+SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v13';
+const PRECACHE = [
+  '/', 
+  '/manifest.json', 
+  '/icon.svg',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(PRECACHE)));
@@ -183,6 +189,10 @@ HTML_TEMPLATE = """
     <link rel="apple-touch-icon" href="/icon.svg">
 
     <link href="https://fonts.googleapis.com/css2?family=Georgia&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- PDF.js Core Script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
     <style>
         :root {
             --espresso: #1E1A17;
@@ -199,6 +209,26 @@ HTML_TEMPLATE = """
             background-color: var(--bg-latte);
             color: var(--text-dark);
             padding-bottom: 90px;
+        }
+
+        /* Suppress Host / Render Free Tier Ad Badge Overlays */
+        [data-render-badge],
+        div[class*="render-badge"],
+        div[id*="render-badge"],
+        iframe[src*="render.com"],
+        a[href*="render.com"][style*="fixed"],
+        a[href*="render.com"][style*="absolute"],
+        a[href*="render.com"][class*="badge"],
+        div[style*="z-index"][style*="fixed"] a[href*="render.com"] {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            opacity: 0 !important;
+            height: 0 !important;
+            width: 0 !important;
+            position: absolute !important;
+            left: -9999px !important;
+            top: -9999px !important;
         }
 
         /* --- Fullscreen Animated Loading Screen --- */
@@ -509,12 +539,12 @@ HTML_TEMPLATE = """
         }
         .helper-text { font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; }
 
-        /* --- Fullscreen In-App PDF Viewer Modal --- */
+        /* --- Self-Processing Native In-App PDF Engine --- */
         #pdfViewerModal {
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: #1E1A17;
+            background: #151210;
             z-index: 99999;
             flex-direction: column;
         }
@@ -535,7 +565,7 @@ HTML_TEMPLATE = """
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 60%;
+            max-width: 55%;
         }
         .pdf-viewer-btns {
             display: flex;
@@ -546,9 +576,9 @@ HTML_TEMPLATE = """
             background: var(--caramel);
             color: #FAF6F2;
             border: none;
-            padding: 6px 12px;
+            padding: 7px 14px;
             border-radius: 12px;
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             font-weight: 700;
             cursor: pointer;
         }
@@ -557,17 +587,46 @@ HTML_TEMPLATE = """
             color: #FAF6F2;
             border: 1px solid rgba(255,255,255,0.3);
             text-decoration: none;
-            padding: 6px 12px;
+            padding: 7px 13px;
             border-radius: 12px;
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             font-weight: 600;
         }
-        .pdf-viewer-frame {
+        #pdf-scroll-container {
             flex: 1;
-            width: 100%;
-            height: 100%;
-            border: none;
-            background: #2B231D;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: #201A16;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 14px 8px 40px 8px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .pdf-page-canvas {
+            display: block;
+            margin: 0 auto 14px auto;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+            max-width: 100%;
+            height: auto !important;
+            border-radius: 4px;
+            background: #FFFFFF;
+        }
+        .pdf-loading-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-top: 80px;
+            color: #FAF6F2;
+        }
+        .pdf-spinner {
+            width: 44px; height: 44px;
+            border: 3px solid rgba(167, 122, 83, 0.25);
+            border-top: 3px solid var(--caramel);
+            border-radius: 50%;
+            animation: spinRing 0.9s linear infinite;
+            margin-bottom: 16px;
         }
     </style>
 </head>
@@ -611,7 +670,7 @@ HTML_TEMPLATE = """
 
 {fab_controls}
 
-<!-- FULLSCREEN IN-APP PDF VIEWER -->
+<!-- Native In-App PDF Rendering Stage -->
 <div id="pdfViewerModal">
     <div class="pdf-viewer-header">
         <div class="pdf-viewer-title" id="pdfModalTitle">Viewing Paper</div>
@@ -620,7 +679,7 @@ HTML_TEMPLATE = """
             <button class="pdf-close-btn" onclick="closePdfViewer()">✕ Back to Folder</button>
         </div>
     </div>
-    <iframe id="pdfViewerFrame" class="pdf-viewer-frame" src=""></iframe>
+    <div id="pdf-scroll-container"></div>
 </div>
 
 <!-- BATCH UPLOAD MODAL -->
@@ -702,6 +761,11 @@ HTML_TEMPLATE = """
 </div>
 
 <script>
+    // Initialize PDF.js Web Worker
+    if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
     function openModal(id) { document.getElementById(id).classList.add('active'); }
     function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
@@ -730,26 +794,75 @@ HTML_TEMPLATE = """
         });
     });
 
-    // In-App PDF Viewer
-    function openPdfViewer(url, title, downloadUrl) {
+    // In-App Self-Rendering PDF Logic
+    let currentRenderTask = null;
+
+    async function openPdfViewer(url, title, downloadUrl) {
         document.getElementById('pdfModalTitle').innerText = title;
         document.getElementById('pdfModalSaveBtn').href = downloadUrl;
-        document.getElementById('pdfViewerFrame').src = url;
+        
+        const container = document.getElementById('pdf-scroll-container');
+        container.innerHTML = `
+            <div class="pdf-loading-wrap">
+                <div class="pdf-spinner"></div>
+                <div style="font-size: 0.88rem; letter-spacing: 0.5px;">Loading Document...</div>
+            </div>
+        `;
         document.getElementById('pdfViewerModal').classList.add('active');
+        
+        // Push State for Android / Browser Hardware Back Button Protection
         history.pushState({ pdfOpen: true }, '');
+
+        try {
+            const loadingTask = pdfjsLib.getDocument(url);
+            const pdf = await loadingTask.promise;
+            container.innerHTML = '';
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                
+                // Scale according to device pixel ratio for sharp text rendering
+                const unscaledViewport = page.getViewport({ scale: 1.0 });
+                const screenWidth = Math.min(window.innerWidth - 16, 750);
+                const scale = screenWidth / unscaledViewport.width;
+                const viewport = page.getViewport({ scale: scale });
+
+                const canvas = document.createElement('canvas');
+                canvas.className = 'pdf-page-canvas';
+                const context = canvas.getContext('2d');
+                
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                container.appendChild(canvas);
+
+                await page.render({
+                    canvasContext: context,
+                    viewport: viewport
+                }).promise;
+            }
+        } catch (err) {
+            console.error(err);
+            container.innerHTML = `
+                <div style="color: #FAF6F2; padding: 40px 20px; text-align: center;">
+                    <p style="margin-bottom: 16px;">Failed to load PDF preview.</p>
+                    <a href="${downloadUrl}" class="btn-pill btn-caramel" style="display:inline-block; padding:10px 24px; text-decoration:none;">Download File Directly</a>
+                </div>
+            `;
+        }
     }
 
     function closePdfViewer(isPopState = false) {
         const viewer = document.getElementById('pdfViewerModal');
         if (viewer.classList.contains('active')) {
             viewer.classList.remove('active');
-            document.getElementById('pdfViewerFrame').src = '';
+            document.getElementById('pdf-scroll-container').innerHTML = '';
             if (!isPopState && history.state && history.state.pdfOpen) {
                 history.back();
             }
         }
     }
 
+    // Intercept Back Button (Keep User In Current Course Folder)
     window.addEventListener('popstate', (e) => {
         const viewer = document.getElementById('pdfViewerModal');
         if (viewer && viewer.classList.contains('active')) {
@@ -820,16 +933,15 @@ HTML_TEMPLATE = """
 """
 
 def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallback_year: str):
-    """Auto-detects course, semester, and year from filename."""
     lower = filename.lower()
     
-    # 1. Detect Year
+    # Detect Year
     detected_year = fallback_year.strip() if fallback_year.strip() else None
     if not detected_year:
         year_match = re.search(r'\b(20[1-2][0-9])\b', lower)
         detected_year = year_match.group(1) if year_match else "2024"
 
-    # 2. Detect Semester
+    # Detect Semester
     detected_sem = fallback_sem
     if fallback_sem == "auto":
         sem_match = re.search(r'(?:sem(?:ester)?[\s_-]*([1-6])|\bs([1-6])\b)', lower)
@@ -839,7 +951,7 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
         else:
             detected_sem = "Sem 1"
 
-    # 3. Detect Course
+    # Detect Course
     detected_course = fallback_course
     if fallback_course == "auto":
         botany_keywords = [
