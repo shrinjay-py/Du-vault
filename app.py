@@ -86,7 +86,7 @@ PWA_MANIFEST = """{
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "background_color": "#E8DDD1",
   "theme_color": "#1E1A17",
   "icons": [
@@ -112,7 +112,7 @@ PWA_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" 
   <text x="256" y="365" font-family="sans-serif" font-size="34" letter-spacing="4" font-weight="bold" fill="#1E1A17" text-anchor="middle">VAULT</text>
 </svg>"""
 
-SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v13';
+SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v15';
 const PRECACHE = [
   '/', 
   '/manifest.json', 
@@ -178,7 +178,7 @@ HTML_TEMPLATE = """
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DU PYQ Vault</title>
     
     <link rel="manifest" href="/manifest.json">
@@ -189,8 +189,6 @@ HTML_TEMPLATE = """
     <link rel="apple-touch-icon" href="/icon.svg">
 
     <link href="https://fonts.googleapis.com/css2?family=Georgia&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- PDF.js Core Script -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
     <style>
@@ -231,7 +229,7 @@ HTML_TEMPLATE = """
             top: -9999px !important;
         }
 
-        /* --- Fullscreen Animated Loading Screen --- */
+        /* Loading Screen */
         #loading-screen {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -241,7 +239,7 @@ HTML_TEMPLATE = """
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            transition: opacity 0.4s ease, visibility 0.4s ease;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
         }
         #loading-screen.fade-out {
             opacity: 0;
@@ -250,12 +248,12 @@ HTML_TEMPLATE = """
         }
         .loader-box {
             position: relative;
-            width: 100px;
-            height: 100px;
+            width: 90px;
+            height: 90px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 18px;
+            margin-bottom: 16px;
         }
         .loader-ring {
             position: absolute;
@@ -267,17 +265,17 @@ HTML_TEMPLATE = """
             animation: spinRing 1s cubic-bezier(0.55, 0.055, 0.675, 0.19) infinite;
         }
         .loader-logo {
-            width: 60px;
-            height: 60px;
+            width: 56px;
+            height: 56px;
             background: var(--caramel);
-            border-radius: 16px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #FAF6F2;
             font-family: 'Georgia', serif;
             font-weight: bold;
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             box-shadow: 0 4px 18px rgba(167, 122, 83, 0.35);
             animation: pulseLogo 1.6s ease-in-out infinite alternate;
         }
@@ -286,7 +284,6 @@ HTML_TEMPLATE = """
             font-family: 'Georgia', serif;
             font-size: 1rem;
             letter-spacing: 1px;
-            opacity: 0.9;
         }
         .loader-subtext {
             color: #A77A53;
@@ -296,19 +293,13 @@ HTML_TEMPLATE = """
             font-weight: 600;
             margin-top: 6px;
         }
-        @keyframes spinRing {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        @keyframes pulseLogo {
-            0% { transform: scale(0.94); filter: brightness(0.95); }
-            100% { transform: scale(1.05); filter: brightness(1.15); }
-        }
+        @keyframes spinRing { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulseLogo { 0% { transform: scale(0.94); } 100% { transform: scale(1.05); } }
 
         header {
             background: var(--espresso);
             color: #FAF6F2;
-            padding: 14px 20px;
+            padding: 14px 24px;
             position: sticky; top: 0; z-index: 50;
             display: flex;
             align-items: center;
@@ -316,7 +307,7 @@ HTML_TEMPLATE = """
         }
         .brand-title { 
             font-family: 'Georgia', serif; 
-            font-size: 1.15rem; 
+            font-size: 1.25rem; 
             font-weight: bold; 
             letter-spacing: 0.5px;
             text-decoration: none;
@@ -325,36 +316,26 @@ HTML_TEMPLATE = """
         .brand-right {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 16px;
         }
         .founder-tag {
             font-family: 'Georgia', serif;
             font-size: 0.9rem;
             color: #FAF6F2;
-            opacity: 0.95;
-            text-align: center;
-            line-height: 1.15;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            text-align: right;
+            line-height: 1.2;
         }
         .founder-tag span.founder-name {
             color: var(--caramel);
             font-weight: 700;
             font-size: 0.95rem;
-            letter-spacing: 0.3px;
         }
         .college-subtag {
-            font-size: 0.48rem;
+            font-size: 0.52rem;
             color: #BFA898;
             font-family: 'Inter', sans-serif;
-            font-weight: 500;
-            font-style: normal;
-            letter-spacing: 0.5px;
             text-transform: uppercase;
-            text-align: center;
-            margin-top: 2px;
-            opacity: 0.8;
+            letter-spacing: 0.5px;
             display: block;
         }
         .admin-lock-btn {
@@ -362,7 +343,7 @@ HTML_TEMPLATE = """
             border: 1px solid rgba(255,255,255,0.25);
             color: #FAF6F2;
             border-radius: 12px;
-            padding: 4px 8px;
+            padding: 5px 10px;
             font-size: 0.75rem;
             cursor: pointer;
             text-decoration: none;
@@ -370,66 +351,27 @@ HTML_TEMPLATE = """
         .admin-banner {
             background: #D4A373;
             color: #1E1A17;
-            padding: 6px 16px;
-            font-size: 0.8rem;
+            padding: 8px 24px;
+            font-size: 0.82rem;
             font-weight: 600;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .admin-banner a {
-            color: #641E16;
-            text-decoration: underline;
-            cursor: pointer;
-        }
-        .container { max-width: 650px; margin: 0 auto; padding: 16px; }
-
-        /* PWA Install Banner & iOS Banner */
-        .install-box {
-            display: none;
-            background: var(--espresso);
-            color: #FAF6F2;
-            padding: 12px 16px;
-            border-radius: 16px;
-            margin-bottom: 14px;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.12);
-        }
-        .install-text {
-            font-size: 0.84rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .install-btn {
-            background: var(--caramel);
-            color: #FAF6F2;
-            border: none;
-            padding: 7px 15px;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 0.78rem;
-            cursor: pointer;
-        }
-        .ios-tip {
-            display: none;
-            background: var(--card-foam);
-            border: 1px dashed var(--caramel);
-            padding: 10px 14px;
-            border-radius: 14px;
-            font-size: 0.8rem;
-            margin-bottom: 14px;
-            text-align: center;
+        .admin-banner a { color: #641E16; text-decoration: underline; cursor: pointer; }
+        
+        .container { 
+            width: 100%;
+            max-width: 1100px; 
+            margin: 0 auto; 
+            padding: 20px 16px; 
         }
 
-        /* Course Folder Grid */
         .folder-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-            gap: 12px;
-            margin: 12px 0 20px 0;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 14px;
+            margin: 14px 0 24px 0;
         }
         .folder-card {
             text-decoration: none;
@@ -437,7 +379,7 @@ HTML_TEMPLATE = """
             background: var(--card-foam);
             border: 1px solid var(--border-latte);
             border-radius: 16px;
-            padding: 18px 12px;
+            padding: 20px 14px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -449,12 +391,10 @@ HTML_TEMPLATE = """
             box-shadow: 0 6px 14px rgba(0,0,0,0.08);
             border-color: var(--caramel);
         }
-        .folder-card:active { transform: scale(0.97); }
-        .folder-card-icon { font-size: 2.2rem; margin-bottom: 8px; }
-        .folder-card-title { font-size: 0.82rem; font-weight: 700; text-align: center; }
-        .folder-card-count { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; }
+        .folder-card-icon { font-size: 2.4rem; margin-bottom: 8px; }
+        .folder-card-title { font-size: 0.88rem; font-weight: 700; text-align: center; }
+        .folder-card-count { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
 
-        /* Directory Top Bar */
         .folder-header-bar {
             display: flex;
             align-items: center;
@@ -462,89 +402,95 @@ HTML_TEMPLATE = """
             background: var(--card-foam);
             border: 1px solid var(--border-latte);
             border-radius: 16px;
-            padding: 14px 18px;
-            margin-bottom: 14px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
         }
         .folder-header-title {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             font-family: 'Georgia', serif;
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             font-weight: bold;
         }
         .back-folder-btn {
             background: var(--espresso);
             color: #FAF6F2;
             text-decoration: none;
-            padding: 8px 14px;
+            padding: 8px 16px;
             border-radius: 12px;
-            font-size: 0.78rem;
+            font-size: 0.82rem;
             font-weight: 600;
         }
 
         .search-box input {
-            width: 100%; padding: 12px 18px; border-radius: 25px;
+            width: 100%; padding: 12px 20px; border-radius: 25px;
             border: 1px solid var(--border-latte); background: var(--card-foam);
             font-size: 0.95rem; outline: none; margin-bottom: 12px;
         }
-        .filters { display: flex; gap: 8px; margin-bottom: 16px; }
+        .filters { display: flex; gap: 10px; margin-bottom: 16px; }
         select {
-            flex: 1; padding: 10px; border-radius: 18px;
+            flex: 1; padding: 11px 14px; border-radius: 18px;
             border: 1px solid var(--border-latte); background: var(--card-foam);
-            font-size: 0.85rem; outline: none;
+            font-size: 0.88rem; outline: none;
+        }
+
+        .cards-layout-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 14px;
         }
         .card {
             background: var(--card-foam); border: 1px solid var(--border-latte);
-            border-radius: 18px; padding: 16px; margin-bottom: 12px;
+            border-radius: 18px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between;
         }
-        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .badge { font-size: 0.75rem; font-weight: 700; color: var(--caramel); }
+        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .badge { font-size: 0.78rem; font-weight: 700; color: var(--caramel); }
         .admin-actions { display: flex; gap: 8px; align-items: center; }
         .edit-btn { background: none; border: none; color: var(--caramel); font-size: 0.85rem; cursor: pointer; font-weight: 600; }
         .del-btn { background: none; border: none; color: #BA1A1A; font-size: 1.1rem; cursor: pointer; padding: 0 4px; }
         
         .card-title { font-family: 'Georgia', serif; font-size: 1.05rem; font-weight: bold; margin-bottom: 6px; }
-        .card-meta { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px; }
+        .card-meta { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px; }
         .btn-pill {
             display: inline-block; text-align: center; width: 100%; padding: 10px 0;
             background: var(--espresso); color: #FAF6F2; text-decoration: none;
-            font-size: 0.85rem; font-weight: 600; border-radius: 20px; border: none; cursor: pointer;
+            font-size: 0.88rem; font-weight: 600; border-radius: 20px; border: none; cursor: pointer;
         }
         .btn-caramel { background: var(--caramel); }
         .fab-bar {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            display: flex; gap: 10px; z-index: 100;
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 12px; z-index: 100;
         }
         .fab {
-            padding: 12px 20px; border-radius: 30px; background: var(--espresso);
-            color: #FAF6F2; border: none; font-size: 0.9rem; font-weight: 600;
+            padding: 13px 22px; border-radius: 30px; background: var(--espresso);
+            color: #FAF6F2; border: none; font-size: 0.92rem; font-weight: 600;
             box-shadow: 0 4px 16px rgba(0,0,0,0.25); cursor: pointer;
         }
         .modal {
             display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(30,26,23,0.65); z-index: 200; align-items: flex-end; justify-content: center;
+            background: rgba(30,26,23,0.65); z-index: 200; align-items: center; justify-content: center;
         }
         .modal.active { display: flex; }
         .modal-content {
-            background: var(--card-foam); width: 100%; max-width: 500px;
-            border-radius: 24px 24px 0 0; padding: 24px; max-height: 85vh; overflow-y: auto;
+            background: var(--card-foam); width: 92%; max-width: 520px;
+            border-radius: 20px; padding: 26px; max-height: 88vh; overflow-y: auto;
         }
-        .modal-title { font-family: 'Georgia', serif; font-size: 1.2rem; font-weight: bold; margin-bottom: 14px; }
-        .form-group { margin-bottom: 12px; }
-        .form-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; }
+        .modal-title { font-family: 'Georgia', serif; font-size: 1.25rem; font-weight: bold; margin-bottom: 14px; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 5px; }
         .form-group input, .form-group select {
-            width: 100%; padding: 10px; border-radius: 12px;
+            width: 100%; padding: 11px; border-radius: 12px;
             border: 1px solid var(--border-latte); background: var(--bg-latte); outline: none;
         }
         .helper-text { font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; }
 
-        /* --- Self-Processing Native In-App PDF Engine --- */
+        /* Fullscreen In-App PDF Viewer */
         #pdfViewerModal {
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: #151210;
+            background: #14110E;
             z-index: 99999;
             flex-direction: column;
         }
@@ -552,73 +498,90 @@ HTML_TEMPLATE = """
         .pdf-viewer-header {
             background: var(--espresso);
             color: #FAF6F2;
-            padding: 12px 16px;
+            padding: 12px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             border-bottom: 1px solid rgba(255,255,255,0.1);
+            gap: 12px;
         }
         .pdf-viewer-title {
             font-family: 'Georgia', serif;
-            font-size: 0.92rem;
+            font-size: 0.95rem;
             font-weight: 600;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             max-width: 55%;
         }
-        .pdf-viewer-btns {
+        .pdf-toolbar {
             display: flex;
-            gap: 8px;
             align-items: center;
+            gap: 10px;
+        }
+        .zoom-controls {
+            display: flex;
+            background: rgba(255,255,255,0.08);
+            border-radius: 14px;
+            padding: 2px;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        .zoom-btn {
+            background: transparent;
+            color: #FAF6F2;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .zoom-btn:hover { background: rgba(255,255,255,0.15); }
+        .zoom-btn:active { background: var(--caramel); }
+        .zoom-level-text {
+            color: #D8C7B6;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 6px 8px;
+            display: flex;
+            align-items: center;
+            min-width: 48px;
+            justify-content: center;
         }
         .pdf-close-btn {
             background: var(--caramel);
             color: #FAF6F2;
             border: none;
-            padding: 7px 14px;
+            padding: 7px 15px;
             border-radius: 12px;
             font-size: 0.82rem;
             font-weight: 700;
             cursor: pointer;
         }
-        .pdf-save-link {
-            background: transparent;
-            color: #FAF6F2;
-            border: 1px solid rgba(255,255,255,0.3);
-            text-decoration: none;
-            padding: 7px 13px;
-            border-radius: 12px;
-            font-size: 0.82rem;
-            font-weight: 600;
-        }
         #pdf-scroll-container {
             flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            background: #201A16;
+            overflow: auto;
+            background: #1E1A17;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 14px 8px 40px 8px;
+            padding: 20px 10px 50px 10px;
             -webkit-overflow-scrolling: touch;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .pdf-canvas-wrap {
+            margin: 0 auto 16px auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            border-radius: 4px;
+            background: #FFFFFF;
+            line-height: 0;
         }
         .pdf-page-canvas {
             display: block;
-            margin: 0 auto 14px auto;
-            box-shadow: 0 4px 18px rgba(0,0,0,0.5);
-            max-width: 100%;
-            height: auto !important;
             border-radius: 4px;
-            background: #FFFFFF;
-        }
-        .pdf-loading-wrap {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin-top: 80px;
-            color: #FAF6F2;
+            pointer-events: none; /* Prevents long-press image saving on mobile */
         }
         .pdf-spinner {
             width: 44px; height: 44px;
@@ -626,13 +589,12 @@ HTML_TEMPLATE = """
             border-top: 3px solid var(--caramel);
             border-radius: 50%;
             animation: spinRing 0.9s linear infinite;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
     </style>
 </head>
 <body>
 
-<!-- Animated Loading Screen -->
 <div id="loading-screen">
     <div class="loader-box">
         <div class="loader-ring"></div>
@@ -656,30 +618,26 @@ HTML_TEMPLATE = """
 {admin_banner_html}
 
 <div class="container">
-    <div id="pwa-install-banner" class="install-box">
-        <div class="install-text"><span>📲</span> Install DU Vault App</div>
-        <button id="pwa-install-btn" class="install-btn">Install</button>
-    </div>
-
-    <div id="ios-install-tip" class="ios-tip">
-        📲 <b>To Install on iPhone:</b> Tap the <b>Share icon (⎋)</b> in Safari & choose <b>'Add to Home Screen'</b>.
-    </div>
-
     {main_view_content}
 </div>
 
 {fab_controls}
 
-<!-- Native In-App PDF Rendering Stage -->
+<!-- Native In-App PDF Viewing Stage (Protected Canvas) -->
 <div id="pdfViewerModal">
     <div class="pdf-viewer-header">
         <div class="pdf-viewer-title" id="pdfModalTitle">Viewing Paper</div>
-        <div class="pdf-viewer-btns">
-            <a id="pdfModalSaveBtn" href="#" class="pdf-save-link">Save</a>
+        <div class="pdf-toolbar">
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="adjustZoom(-0.25)" title="Zoom Out">-</button>
+                <div class="zoom-level-text" id="zoomLevelDisplay">100%</div>
+                <button class="zoom-btn" onclick="adjustZoom(0.25)" title="Zoom In">+</button>
+                <button class="zoom-btn" onclick="resetZoom()" title="Fit to Screen" style="border-left: 1px solid rgba(255,255,255,0.15);">⟲</button>
+            </div>
             <button class="pdf-close-btn" onclick="closePdfViewer()">✕ Back to Folder</button>
         </div>
     </div>
-    <div id="pdf-scroll-container"></div>
+    <div id="pdf-scroll-container" oncontextmenu="return false;"></div>
 </div>
 
 <!-- BATCH UPLOAD MODAL -->
@@ -761,7 +719,6 @@ HTML_TEMPLATE = """
 </div>
 
 <script>
-    // Initialize PDF.js Web Worker
     if (window.pdfjsLib) {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
@@ -779,76 +736,110 @@ HTML_TEMPLATE = """
         if (loader) loader.classList.add('fade-out');
     }
 
-    window.addEventListener('load', () => {
-        setTimeout(hideLoader, 250);
-    });
+    window.addEventListener('load', () => { setTimeout(hideLoader, 200); });
 
     document.addEventListener('DOMContentLoaded', () => {
         const triggers = document.querySelectorAll('a.folder-card, a.back-folder-btn');
         triggers.forEach(el => {
             el.addEventListener('click', (e) => {
-                if (!e.ctrlKey && !e.metaKey && !el.target) {
-                    showLoader();
-                }
+                if (!e.ctrlKey && !e.metaKey && !el.target) { showLoader(); }
             });
         });
     });
 
-    // In-App Self-Rendering PDF Logic
-    let currentRenderTask = null;
+    let activePdfDoc = null;
+    let currentZoomMultiplier = 1.0;
 
-    async function openPdfViewer(url, title, downloadUrl) {
+    async function openPdfViewer(url, title) {
         document.getElementById('pdfModalTitle').innerText = title;
-        document.getElementById('pdfModalSaveBtn').href = downloadUrl;
-        
+        currentZoomMultiplier = 1.0;
+        updateZoomDisplay();
+
         const container = document.getElementById('pdf-scroll-container');
         container.innerHTML = `
-            <div class="pdf-loading-wrap">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-top: 80px; color: #FAF6F2;">
                 <div class="pdf-spinner"></div>
                 <div style="font-size: 0.88rem; letter-spacing: 0.5px;">Loading Document...</div>
             </div>
         `;
         document.getElementById('pdfViewerModal').classList.add('active');
-        
-        // Push State for Android / Browser Hardware Back Button Protection
         history.pushState({ pdfOpen: true }, '');
 
         try {
             const loadingTask = pdfjsLib.getDocument(url);
-            const pdf = await loadingTask.promise;
-            container.innerHTML = '';
-
-            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                const page = await pdf.getPage(pageNum);
-                
-                // Scale according to device pixel ratio for sharp text rendering
-                const unscaledViewport = page.getViewport({ scale: 1.0 });
-                const screenWidth = Math.min(window.innerWidth - 16, 750);
-                const scale = screenWidth / unscaledViewport.width;
-                const viewport = page.getViewport({ scale: scale });
-
-                const canvas = document.createElement('canvas');
-                canvas.className = 'pdf-page-canvas';
-                const context = canvas.getContext('2d');
-                
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
-                container.appendChild(canvas);
-
-                await page.render({
-                    canvasContext: context,
-                    viewport: viewport
-                }).promise;
-            }
+            activePdfDoc = await loadingTask.promise;
+            await renderPdfPages();
         } catch (err) {
             console.error(err);
             container.innerHTML = `
                 <div style="color: #FAF6F2; padding: 40px 20px; text-align: center;">
-                    <p style="margin-bottom: 16px;">Failed to load PDF preview.</p>
-                    <a href="${downloadUrl}" class="btn-pill btn-caramel" style="display:inline-block; padding:10px 24px; text-decoration:none;">Download File Directly</a>
+                    <p>Failed to load document preview.</p>
                 </div>
             `;
         }
+    }
+
+    async function renderPdfPages() {
+        if (!activePdfDoc) return;
+        const container = document.getElementById('pdf-scroll-container');
+        container.innerHTML = '';
+
+        const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+        const availableWidth = Math.min(window.innerWidth - 32, 950);
+
+        for (let pageNum = 1; pageNum <= activePdfDoc.numPages; pageNum++) {
+            const page = await activePdfDoc.getPage(pageNum);
+            
+            const unscaledViewport = page.getViewport({ scale: 1.0 });
+            const baseScale = availableWidth / unscaledViewport.width;
+            const finalScale = baseScale * currentZoomMultiplier;
+
+            const cssViewport = page.getViewport({ scale: finalScale });
+            const highResViewport = page.getViewport({ scale: finalScale * dpr });
+
+            const wrap = document.createElement('div');
+            wrap.className = 'pdf-canvas-wrap';
+
+            const canvas = document.createElement('canvas');
+            canvas.className = 'pdf-page-canvas';
+            const context = canvas.getContext('2d');
+
+            canvas.width = Math.floor(highResViewport.width);
+            canvas.height = Math.floor(highResViewport.height);
+
+            canvas.style.width = Math.floor(cssViewport.width) + 'px';
+            canvas.style.height = Math.floor(cssViewport.height) + 'px';
+
+            wrap.appendChild(canvas);
+            container.appendChild(wrap);
+
+            await page.render({
+                canvasContext: context,
+                viewport: highResViewport
+            }).promise;
+        }
+    }
+
+    function updateZoomDisplay() {
+        const display = document.getElementById('zoomLevelDisplay');
+        if (display) {
+            display.innerText = Math.round(currentZoomMultiplier * 100) + '%';
+        }
+    }
+
+    function adjustZoom(delta) {
+        const nextZoom = currentZoomMultiplier + delta;
+        if (nextZoom >= 0.5 && nextZoom <= 3.0) {
+            currentZoomMultiplier = Math.round(nextZoom * 100) / 100;
+            updateZoomDisplay();
+            renderPdfPages();
+        }
+    }
+
+    function resetZoom() {
+        currentZoomMultiplier = 1.0;
+        updateZoomDisplay();
+        renderPdfPages();
     }
 
     function closePdfViewer(isPopState = false) {
@@ -856,13 +847,13 @@ HTML_TEMPLATE = """
         if (viewer.classList.contains('active')) {
             viewer.classList.remove('active');
             document.getElementById('pdf-scroll-container').innerHTML = '';
+            activePdfDoc = null;
             if (!isPopState && history.state && history.state.pdfOpen) {
                 history.back();
             }
         }
     }
 
-    // Intercept Back Button (Keep User In Current Course Folder)
     window.addEventListener('popstate', (e) => {
         const viewer = document.getElementById('pdfViewerModal');
         if (viewer && viewer.classList.contains('active')) {
@@ -885,7 +876,7 @@ HTML_TEMPLATE = """
         cards.forEach(card => {
             const text = card.getAttribute('data-search-text') || '';
             if (text.includes(term)) {
-                card.style.display = 'block';
+                card.style.display = 'flex';
             } else {
                 card.style.display = 'none';
             }
@@ -897,36 +888,6 @@ HTML_TEMPLATE = """
             navigator.serviceWorker.register('/sw.js', { scope: '/' });
         });
     }
-
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        const banner = document.getElementById('pwa-install-banner');
-        if (banner) banner.style.display = 'flex';
-    });
-
-    const installBtn = document.getElementById('pwa-install-btn');
-    if (installBtn) {
-        installBtn.addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    const banner = document.getElementById('pwa-install-banner');
-                    if (banner) banner.style.display = 'none';
-                }
-                deferredPrompt = null;
-            }
-        });
-    }
-
-    const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-    const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
-    if (isIos() && !isInStandaloneMode()) {
-        const iosTip = document.getElementById('ios-install-tip');
-        if (iosTip) iosTip.style.display = 'block';
-    }
 </script>
 </body>
 </html>
@@ -935,13 +896,11 @@ HTML_TEMPLATE = """
 def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallback_year: str):
     lower = filename.lower()
     
-    # Detect Year
     detected_year = fallback_year.strip() if fallback_year.strip() else None
     if not detected_year:
         year_match = re.search(r'\b(20[1-2][0-9])\b', lower)
         detected_year = year_match.group(1) if year_match else "2024"
 
-    # Detect Semester
     detected_sem = fallback_sem
     if fallback_sem == "auto":
         sem_match = re.search(r'(?:sem(?:ester)?[\s_-]*([1-6])|\bs([1-6])\b)', lower)
@@ -951,7 +910,6 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
         else:
             detected_sem = "Sem 1"
 
-    # Detect Course
     detected_course = fallback_course
     if fallback_course == "auto":
         botany_keywords = [
@@ -1012,9 +970,8 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
 
     main_view_content = ""
 
-    # Home Screen: Folder Drive Grid
     if not course and not q.strip():
-        folders_grid = '<div style="font-size: 0.82rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">Select Course Folder</div>'
+        folders_grid = '<div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">Select Course Folder</div>'
         folders_grid += '<div class="folder-grid">'
         for tile in COURSE_TILES:
             encoded_c = urllib.parse.quote_plus(tile["name"])
@@ -1036,8 +993,6 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
         </form>
         """
         main_view_content = search_bar + folders_grid
-
-    # Inside Course Folder / Search View
     else:
         query = "SELECT id, title, course, semester, year, type, url_or_name, file_size FROM du_resources WHERE 1=1"
         params = []
@@ -1085,19 +1040,19 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
 
         cards_html = ""
         if not records:
-            cards_html = f'<div class="card" style="text-align:center; padding:36px;"><p style="color:var(--text-muted);">No papers found inside this folder.</p></div>'
+            cards_html = f'<div class="card" style="text-align:center; padding:40px;"><p style="color:var(--text-muted);">No papers found inside this folder.</p></div>'
         else:
+            cards_html = '<div class="cards-layout-grid">'
             for item_id, title, c, s, y, r_type, url_or_name, size in records:
                 safe_title_view = title.replace("'", "\\'")
                 if r_type == "pdf":
                     action_btn = f"""
-                    <div style="display: flex; gap: 8px; margin-top: 8px;">
-                        <button class="btn-pill" onclick="openPdfViewer('/view/{item_id}', '{safe_title_view}', '/download/{item_id}')" style="flex: 1; text-align: center;">View</button>
-                        <a class="btn-pill btn-caramel" href="/download/{item_id}" style="flex: 1; text-align: center;">Save</a>
+                    <div style="margin-top: 10px;">
+                        <button class="btn-pill" onclick="openPdfViewer('/view/{item_id}', '{safe_title_view}')">View</button>
                     </div>
                     """
                 else:
-                    action_btn = f'<a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">Open Link</a>'
+                    action_btn = f'<div style="margin-top: 10px;"><a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">Open Link</a></div>'
 
                 admin_opts = ""
                 if is_admin:
@@ -1116,15 +1071,18 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
 
                 cards_html += f"""
                 <div class="card card-item" data-search-text="{card_search_data}">
-                    <div class="card-top">
-                        <span class="badge">{c}</span>
-                        {admin_opts}
+                    <div>
+                        <div class="card-top">
+                            <span class="badge">{c}</span>
+                            {admin_opts}
+                        </div>
+                        <div class="card-title">{title}</div>
+                        <div class="card-meta">🎓 {s} &nbsp;•&nbsp; 📅 {y} &nbsp;•&nbsp; 💾 {size}</div>
                     </div>
-                    <div class="card-title">{title}</div>
-                    <div class="card-meta">🎓 {s} &nbsp;•&nbsp; 📅 {y} &nbsp;•&nbsp; 💾 {size}</div>
                     {action_btn}
                 </div>
                 """
+            cards_html += '</div>'
 
         main_view_content = header_bar + search_filter_form + f'<div id="cards-container">{cards_html}</div>'
 
@@ -1247,25 +1205,6 @@ def add_link(
     conn.commit()
     conn.close()
     return RedirectResponse(url=f"/?course={urllib.parse.quote_plus(course)}", status_code=303)
-
-@app.get("/download/{item_id}")
-def download_pdf(item_id: int):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT title, file_data FROM du_resources WHERE id = ?", (item_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row and row[1]:
-        return StreamingResponse(
-            io.BytesIO(row[1]),
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f'attachment; filename="{row[0]}.pdf"',
-                "X-Content-Type-Options": "nosniff",
-                "Cache-Control": "public, max-age=604800, immutable"
-            }
-        )
-    return HTMLResponse("Not Found", status_code=404)
 
 @app.get("/view/{item_id}")
 def view_pdf(item_id: int):
