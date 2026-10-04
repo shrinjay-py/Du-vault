@@ -1119,17 +1119,19 @@ def view_folder(cat: str, course_path: str, request: Request):
 
     for item in items:
         item_id, title, c_course, sem, year, r_type, c_cat, url_or_name, file_size = item
+        clean_title = title.replace("'", "\\'")
+        clean_course = c_course.replace("'", "\\'")
         
         if r_type == "link":
             action_btn = f'<a href="{url_or_name}" target="_blank" class="btn-pill btn-caramel">🔗 Open External Link</a>'
         else:
-            action_btn = f'<button onclick="openPdfViewer(\'/view/{item_id}\', \'{title.replace("\'", "\\\'")}\')" class="btn-pill">📄 View Document</button>'
+            action_btn = f'<button onclick="openPdfViewer(\'/view/{item_id}\', \'{clean_title}\')" class="btn-pill">📄 View Document</button>'
 
         admin_tools = ""
         if admin_active:
             admin_tools = f"""
             <div class="admin-actions">
-                <button class="edit-btn" onclick="openEditModal({item_id}, '{title.replace("\'", "\\\'")}', '{c_course.replace("\'", "\\\'")}', '{sem}', '{year}', '{c_cat}')">✏️ Edit</button>
+                <button class="edit-btn" onclick="openEditModal({item_id}, '{clean_title}', '{clean_course}', '{sem}', '{year}', '{c_cat}')">✏️ Edit</button>
                 <form action="/delete/{item_id}" method="POST" style="display:inline;" onsubmit="return confirm('Delete this resource?')">
                     <button type="submit" class="del-btn" title="Delete Resource">🗑️</button>
                 </form>
