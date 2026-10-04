@@ -1,4 +1,5 @@
-import os
+
+   import os
 import io
 import re
 import urllib.parse
@@ -57,6 +58,13 @@ COURSE_TILES = [
 
 SEMESTERS = ["All Semesters", "Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 6"]
 
+CATEGORY_MAP = {
+    "pyq": {"label": "📄 PYQs", "icon": "📄", "name": "Previous Year Questions"},
+    "notes": {"label": "📝 Notes", "icon": "📝", "name": "Notes & Study Material"},
+    "practical": {"label": "🔬 Practical", "icon": "🔬", "name": "Practical Files & Lab Manuals"},
+    "timetable": {"label": "📅 Timetable", "icon": "📅", "name": "Timetables & Schedules"}
+}
+
 def init_db():
     conn = get_db()
     cursor = conn.cursor()
@@ -75,7 +83,6 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Ensure column 'category' exists for legacy DBs
     try:
         cursor.execute("ALTER TABLE du_resources ADD COLUMN category TEXT DEFAULT 'pyq'")
     except Exception:
@@ -856,22 +863,20 @@ HTML_TEMPLATE = """
             const cssViewport = page.getViewport({ scale: finalScale });
             const highResViewport = page.getViewport({ scale: finalScale * dpr });
 
-            const wrap = document.createElement('div');
-            wrap.className = 'pdf-canvas-wrap';
+            const canvasWrap = document.createElement('div');
+            canvasWrap.className = 'pdf-canvas-wrap';
 
             const canvas = document.createElement('canvas');
             canvas.className = 'pdf-page-canvas';
+            canvas.height = highResViewport.height;
+            canvas.width = highResViewport.width;
+            canvas.style.width = cssViewport.width + 'px';
+            canvas.style.height = cssViewport.height + 'px';
+
+            canvasWrap.appendChild(canvas);
+            container.appendChild(canvasWrap);
+
             const context = canvas.getContext('2d');
-
-            canvas.width = Math.floor(highResViewport.width);
-            canvas.height = Math.floor(highResViewport.height);
-
-            canvas.style.width = Math.floor(cssViewport.width) + 'px';
-            canvas.style.height = Math.floor(cssViewport.height) + 'px';
-
-            wrap.appendChild(canvas);
-            container.appendChild(wrap);
-
             await page.render({
                 canvasContext: context,
                 viewport: highResViewport
@@ -879,20 +884,10 @@ HTML_TEMPLATE = """
         }
     }
 
-    function updateZoomDisplay() {
-        const display = document.getElementById('zoomLevelDisplay');
-        if (display) {
-            display.innerText = Math.round(currentZoomMultiplier * 100) + '%';
-        }
-    }
-
     function adjustZoom(delta) {
-        const nextZoom = currentZoomMultiplier + delta;
-        if (nextZoom >= 0.5 && nextZoom <= 3.0) {
-            currentZoomMultiplier = Math.round(nextZoom * 100) / 100;
-            updateZoomDisplay();
-            renderPdfPages();
-        }
+        currentZoomMultiplier = Math.max(0.5, Math.min(3.0, currentZoomMultiplier + delta));
+        updateZoomDisplay();
+        renderPdfPages();
     }
 
     function resetZoom() {
@@ -901,22 +896,22 @@ HTML_TEMPLATE = """
         renderPdfPages();
     }
 
-    function closePdfViewer(isPopState = false) {
-        const viewer = document.getElementById('pdfViewerModal');
-        if (viewer.classList.contains('active')) {
-            viewer.classList.remove('active');
-            document.getElementById('pdf-scroll-container').innerHTML = '';
-            activePdfDoc = null;
-            if (!isPopState && history.state && history.state.pdfOpen) {
-                history.back();
-            }
+    function updateZoomDisplay() {
+        const el = document.getElementById('zoomLevelDisplay');
+        if (el) el.innerText = Math.round(currentZoomMultiplier * 100) + '%';
+    }
+
+    function closePdfViewer() {
+        document.getElementById('pdfViewerModal').classList.remove('active');
+        activePdfDoc = null;
+        if (history.state && history.state.pdfOpen) {
+            history.back();
         }
     }
 
     window.addEventListener('popstate', (e) => {
-        const viewer = document.getElementById('pdfViewerModal');
-        if (viewer && viewer.classList.contains('active')) {
-            closePdfViewer(true);
+        if (document.getElementById('pdfViewerModal').classList.contains('active')) {
+            closePdfViewer();
         }
     });
 
@@ -926,383 +921,288 @@ HTML_TEMPLATE = """
         document.getElementById('edit_course').value = course;
         document.getElementById('edit_sem').value = sem;
         document.getElementById('edit_year').value = year;
-        if (document.getElementById('edit_category')) {
-            document.getElementById('edit_category').value = category || 'pyq';
-        }
+        document.getElementById('edit_category').value = category || 'pyq';
         openModal('editModal');
     }
 
-    function filterCardsLive(query) {
-        const term = query.toLowerCase().trim();
-        const cards = document.querySelectorAll('.card-item');
+    function filterCards() {
+        const searchVal = document.getElementById('searchInput').value.toLowerCase();
+        const semVal = document.getElementById('semFilter').value;
+        const cards = document.querySelectorAll('.card');
+
         cards.forEach(card => {
-            const text = card.getAttribute('data-search-text') || '';
-            if (text.includes(term)) {
-                card.style.display = 'flex';
-            } else {
-                card.style.display = 'none';
-            }
+            const title = card.getAttribute('data-title').toLowerCase();
+            const course = card.getAttribute('data-course').toLowerCase();
+            const sem = card.getAttribute('data-sem');
+
+            const matchesSearch = title.includes(searchVal) || course.includes(searchVal);
+            const matchesSem = (semVal === 'All Semesters' || sem === semVal);
+
+            card.style.display = (matchesSearch && matchesSem) ? 'flex' : 'none';
         });
     }
 
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js', { scope: '/' });
+            navigator.serviceWorker.register('/sw.js');
         });
     }
 </script>
+
 </body>
 </html>
 """
 
-def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallback_year: str):
-    lower = filename.lower()
+def is_admin(request: Request) -> bool:
+    return request.cookies.get("vault_admin") == "1"
+
+def render_page(request: Request, main_content: str) -> HTMLResponse:
+    admin_active = is_admin(request)
     
-    detected_year = fallback_year.strip() if fallback_year.strip() else None
-    if not detected_year:
-        year_match = re.search(r'\b(20[1-2][0-9])\b', lower)
-        detected_year = year_match.group(1) if year_match else "2024"
+    admin_header_btn = '<a class="admin-lock-btn" onclick="openModal(\'loginModal\')">🔒 Admin Access</a>'
+    if admin_active:
+        admin_header_btn = '<a class="admin-lock-btn" href="/logout">🔓 Exit Admin Mode</a>'
 
-    detected_sem = fallback_sem
-    if fallback_sem == "auto":
-        sem_match = re.search(r'(?:sem(?:ester)?[\s_-]*([1-6])|\bs([1-6])\b)', lower)
-        if sem_match:
-            digit = sem_match.group(1) or sem_match.group(2)
-            detected_sem = f"Sem {digit}"
-        else:
-            detected_sem = "Sem 1"
+    admin_banner_html = ""
+    if admin_active:
+        admin_banner_html = """
+        <div class="admin-banner">
+            <span>⚡ Host Admin Session Active — You have full management privileges.</span>
+            <a href="/logout">Logout Admin</a>
+        </div>
+        """
 
-    detected_course = fallback_course
-    if fallback_course == "auto":
-        botany_keywords = [
-            "botany", "plant", "archegoniate", "bryophyte", "pteridophyte", 
-            "gymnosperm", "angiosperm", "algae", "microbiology", "mycology", 
-            "phytopathology", "plant physiology", "plant metabolism", "plant ecology"
-        ]
-        zoology_keywords = [
-            "zoology", "animal", "chordata", "non-chordata", "physiology", 
-            "developmental biology", "genetics", "evolution"
-        ]
-        
-        if any(k in lower for k in botany_keywords):
-            detected_course = "B.Sc (Hons) Botany"
-        elif any(k in lower for k in zoology_keywords):
-            detected_course = "B.Sc (Hons) Zoology"
-        elif "life science" in lower or "life-science" in lower:
-            detected_course = "B.Sc (prog) Life Sciences"
-        elif any(k in lower for k in ["cs", "computer", "c++", "python", "algorithm", "data structure", "dbms", "os"]):
-            detected_course = "B.Sc (Hons) Computer Science"
-        elif any(k in lower for k in ["math", "calculus", "algebra", "differential", "real analysis"]):
-            detected_course = "B.Sc (Hons) Mathematics"
-        elif any(k in lower for k in ["physic", "mechanics", "optics", "electromagnet", "quantum"]):
-            detected_course = "B.Sc (Hons) Physics"
-        elif any(k in lower for k in ["physical science", "physical science with chemistry"]):
-            detected_course = "B.Sc (prog) Physical science with Chemistry"
-        elif any(k in lower for k in ["chemistry", "organic", "inorganic", "physical chem"]):
-            detected_course = "B.Sc (Hons) Chemistry"
-        elif "bcom hons" in lower or "b.com (h)" in lower:
-            detected_course = "B.Com (Hons)"
-        elif "bcom" in lower or "b.com" in lower:
-            detected_course = "B.Com (Programme)"
-        elif "econ" in lower or "macro" in lower or "micro" in lower:
-            detected_course = "B.A. (Hons) Economics"
-        elif "english" in lower or "literature" in lower:
-            detected_course = "B.A. (Hons) English"
-        elif any(k in lower for k in ["pol", "constitution", "governance", "political science"]):
-            detected_course = "B.A. (Hons) Political Science"
-        elif "ba prog" in lower or "b.a prog" in lower:
-            detected_course = "B.A. Programme"
-        elif "cic" in lower or "b.tech" in lower:
-            detected_course = "B.Tech / CIC"
-        else:
-            detected_course = "General / Other"
+    fab_controls = ""
+    if admin_active:
+        fab_controls = """
+        <div class="fab-bar">
+            <button class="fab" onclick="openModal('uploadModal')">📤 Batch Upload PDFs</button>
+            <button class="fab" onclick="openModal('linkModal')" style="background: var(--caramel);">🔗 Add Link</button>
+        </div>
+        """
 
-    base = os.path.splitext(filename)[0]
-    clean_title = re.sub(r'_+', ' ', base).strip().title()
-    return clean_title, detected_course, detected_sem, detected_year
+    course_opts = "".join([f'<option value="{c}">{c}</option>' for c in COURSES if c != "All Courses"])
+    sem_opts = "".join([f'<option value="{s}">{s}</option>' for s in SEMESTERS if s != "All Semesters"])
+
+    html = HTML_TEMPLATE.format(
+        admin_header_btn=admin_header_btn,
+        admin_banner_html=admin_banner_html,
+        main_view_content=main_content,
+        fab_controls=fab_controls,
+        upload_course_options=course_opts,
+        upload_sem_options=sem_opts
+    )
+    return HTMLResponse(content=html)
+
+def auto_detect_metadata(filename: str):
+    fname = filename.upper()
+    
+    # Semester detection
+    sem = "Sem 1"
+    sem_match = re.search(r'SEM(?:ESTER)?[\s\-_]*([1-6])', fname)
+    if sem_match:
+        sem = f"Sem {sem_match.group(1)}"
+    
+    # Year detection
+    year = "2024"
+    year_match = re.search(r'(20\d{2})', fname)
+    if year_match:
+        year = year_match.group(1)
+
+    # Course detection
+    course = "General / Other"
+    if "BOTANY" in fname:
+        course = "B.Sc (Hons) Botany"
+    elif "ZOOLOGY" in fname:
+        course = "B.Sc (Hons) Zoology"
+    elif "LIFE SCIENCE" in fname or "LIFE_SCIENCE" in fname:
+        course = "B.Sc (prog) Life Sciences"
+    elif "CHEMISTRY" in fname or "CHEM" in fname:
+        course = "B.Sc (Hons) Chemistry"
+    elif "MATH" in fname:
+        course = "B.Sc (Hons) Mathematics"
+    elif "PHYSICS" in fname or "PHYS" in fname:
+        course = "B.Sc (Hons) Physics"
+    elif "COMPUTER" in fname or "CS" in fname:
+        course = "B.Sc (Hons) Computer Science"
+    elif "BCOM" in fname or "B.COM" in fname:
+        course = "B.Com (Hons)"
+    elif "ECONOMICS" in fname or "ECO" in fname:
+        course = "B.A. (Hons) Economics"
+    elif "POL" in fname or "POLITICAL" in fname:
+        course = "B.A. (Hons) Political Science"
+    elif "ENGLISH" in fname:
+        course = "B.A. (Hons) English"
+
+    # Clean title
+    title = re.sub(r'\.pdf$', '', filename, flags=re.IGNORECASE)
+    title = re.sub(r'[\-_]', ' ', title).strip()
+
+    return title, course, sem, year
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, cat: str = "", course: str = "", sem: str = "All Semesters", q: str = ""):
-    is_admin = request.cookies.get("du_admin_session") == "authenticated"
+def index(request: Request):
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    counts = {}
+    for cat in CATEGORY_MAP.keys():
+        cursor.execute("SELECT COUNT(*) FROM du_resources WHERE category = ?", (cat,))
+        counts[cat] = cursor.fetchone()[0]
+    conn.close()
+
+    cards_html = ""
+    for cat_key, meta in CATEGORY_MAP.items():
+        cards_html += f"""
+        <a href="/category/{cat_key}" class="category-card">
+            <div class="category-icon">{meta['icon']}</div>
+            <div class="category-title">{meta['name']}</div>
+            <div class="folder-card-count" style="margin-top:6px;">{counts.get(cat_key, 0)} Items Available</div>
+        </a>
+        """
+
+    content = f"""
+    <div style="text-align: center; margin-bottom: 24px;">
+        <h1 style="font-family: 'Georgia', serif; font-size: 1.8rem; margin-bottom: 6px;">Delhi University Vault</h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem;">Select a category to browse past papers, study material, and course resources.</p>
+    </div>
+    <div class="category-grid">
+        {cards_html}
+    </div>
+    """
+    return render_page(request, content)
+
+@app.get("/category/{cat}", response_class=HTMLResponse)
+def view_category(cat: str, request: Request):
+    if cat not in CATEGORY_MAP:
+        return RedirectResponse(url="/", status_code=303)
+
+    cat_meta = CATEGORY_MAP[cat]
     conn = get_db()
     cursor = conn.cursor()
 
-    main_view_content = ""
-
-    # LEVEL 1: Main display with PYQs, Notes, Practical, Timetable icons
-    if not cat and not course and not q.strip():
-        main_view_content = """
-        <div style="text-align: center; margin: 10px 0 20px 0;">
-            <h2 style="font-family: 'Georgia', serif; font-size: 1.6rem; color: var(--espresso);">Select Resource Vault</h2>
-            <p style="color: var(--text-muted); font-size: 0.88rem; margin-top: 4px;">Choose a section to view past papers, notes, or timetables</p>
-        </div>
-        <div class="category-grid">
-            <a href="/?cat=pyq" class="category-card">
-                <div class="category-icon">📄</div>
-                <div class="category-title">PYQs</div>
-            </a>
-            <a href="/?cat=notes" class="category-card">
-                <div class="category-icon">📝</div>
-                <div class="category-title">Notes</div>
-            </a>
-            <a href="/?cat=practical" class="category-card">
-                <div class="category-icon">🔬</div>
-                <div class="category-title">Practical</div>
-            </a>
-            <a href="/?cat=timetable" class="category-card">
-                <div class="category-icon">📅 🔗</div>
-                <div class="category-title">Timetable</div>
-            </a>
-        </div>
-        <form method="GET" action="/" style="margin-top: 20px;">
-            <div class="search-box">
-                <input type="text" name="q" placeholder="🔍 Search any paper, notes, or resources...">
-            </div>
-        </form>
-        """
-
-    # LEVEL 2: Inside a section (e.g. PYQs), show all subject/course tiles
-    elif cat and not course and not q.strip():
-        category_labels = {
-            "pyq": "📄 PYQs Vault",
-            "notes": "📝 Notes Vault",
-            "practical": "🔬 Practical Vault",
-            "timetable": "📅 Timetables (External Links 🔗)"
-        }
-        current_cat_label = category_labels.get(cat, "Vault")
-
-        if cat == "timetable":
-            # Direct listing for Timetable external links
-            cursor.execute("SELECT id, title, course, semester, year, type, url_or_name, file_size FROM du_resources WHERE category = 'timetable' ORDER BY id DESC")
-            records = cursor.fetchall()
-            
-            header_bar = f"""
-            <div class="folder-header-bar">
-                <div class="folder-header-title">
-                    <span>📅</span>
-                    <span>Timetable & External Links</span>
-                </div>
-                <a href="/" class="back-folder-btn">← Main Menu</a>
-            </div>
-            """
-            
-            cards_html = ""
-            if not records:
-                cards_html = '<div class="card" style="text-align:center; padding:40px;"><p style="color:var(--text-muted);">No timetable links added yet.</p></div>'
-            else:
-                cards_html = '<div class="cards-layout-grid">'
-                for item_id, title, c, s, y, r_type, url_or_name, size in records:
-                    admin_opts = ""
-                    if is_admin:
-                        safe_title = title.replace("'", "\\'")
-                        safe_c = c.replace("'", "\\'")
-                        admin_opts = f"""
-                        <div class="admin-actions">
-                            <button class="edit-btn" onclick="openEditModal({item_id}, '{safe_title}', '{safe_c}', '{s}', '{y}', 'timetable')">✎ Edit</button>
-                            <form action="/delete/{item_id}" method="POST" onsubmit="return confirm('Delete item?');">
-                                <button type="submit" class="del-btn">✕</button>
-                            </form>
-                        </div>
-                        """
-                    cards_html += f"""
-                    <div class="card card-item">
-                        <div>
-                            <div class="card-top">
-                                <span class="badge">{c}</span>
-                                {admin_opts}
-                            </div>
-                            <div class="card-title">{title}</div>
-                            <div class="card-meta">🎓 {s} &nbsp;•&nbsp; 📅 {y}</div>
-                        </div>
-                        <div style="margin-top: 10px;">
-                            <a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open External Link</a>
-                        </div>
-                    </div>
-                    """
-                cards_html += '</div>'
-            main_view_content = header_bar + cards_html
-        else:
-            cursor.execute("SELECT course, COUNT(*) FROM du_resources WHERE category = ? GROUP BY course", (cat,))
-            counts = dict(cursor.fetchall())
-
-            header_bar = f"""
-            <div class="folder-header-bar">
-                <div class="folder-header-title">
-                    <span>{current_cat_label}</span>
-                </div>
-                <a href="/" class="back-folder-btn">← Main Menu</a>
-            </div>
-            """
-
-            folders_grid = '<div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">Select Course / Subject Folder</div>'
-            folders_grid += '<div class="folder-grid">'
-            for tile in COURSE_TILES:
-                encoded_c = urllib.parse.quote_plus(tile["name"])
-                num_papers = counts.get(tile["name"], 0)
-                folders_grid += f"""
-                <a href="/?cat={cat}&course={encoded_c}" class="folder-card">
-                    <div class="folder-card-icon">{tile["icon"]}</div>
-                    <div class="folder-card-title">{tile["label"]}</div>
-                    <div class="folder-card-count">{num_papers} items</div>
-                </a>
-                """
-            folders_grid += '</div>'
-
-            search_bar = f"""
-            <form method="GET" action="/">
-                <input type="hidden" name="cat" value="{cat}">
-                <div class="search-box" style="margin-top: 10px;">
-                    <input type="text" name="q" placeholder="🔍 Search inside {current_cat_label}...">
-                </div>
-            </form>
-            """
-            main_view_content = header_bar + search_bar + folders_grid
-
-    # LEVEL 3: Inside a course icon (e.g. Botany inside PYQs) -> PDFs with Filters
-    else:
-        query = "SELECT id, title, course, semester, year, type, url_or_name, file_size, category FROM du_resources WHERE 1=1"
-        params = []
-
-        if cat:
-            query += " AND category = ?"
-            params.append(cat)
-        if course:
-            query += " AND course = ?"
-            params.append(course)
-        if sem != "All Semesters":
-            query += " AND semester = ?"
-            params.append(sem)
-        if q.strip():
-            query += " AND (LOWER(title) LIKE ? OR LOWER(course) LIKE ? OR LOWER(year) LIKE ?)"
-            wc = f"%{q.strip().lower()}%"
-            params.extend([wc, wc, wc])
-
-        query += " ORDER BY id DESC"
-        cursor.execute(query, tuple(params))
-        records = cursor.fetchall()
-
-        matched_tile = next((t for t in COURSE_TILES if t["name"] == course), None)
-        folder_icon = matched_tile["icon"] if matched_tile else "📁"
-        folder_display_name = matched_tile["label"] if matched_tile else (course or f"Search: '{q}'")
-        
-        back_link = f"/?cat={cat}" if cat else "/"
-
-        header_bar = f"""
-        <div class="folder-header-bar">
-            <div class="folder-header-title">
-                <span>{folder_icon}</span>
-                <span>{folder_display_name}</span>
-            </div>
-            <a href="{back_link}" class="back-folder-btn">← Back to Folders</a>
-        </div>
-        """
-
-        search_filter_form = f"""
-        <form method="GET" action="/">
-            <input type="hidden" name="cat" value="{cat}">
-            <input type="hidden" name="course" value="{course}">
-            <div class="search-box">
-                <input type="text" name="q" value="{q}" placeholder="⚡ Live search by subject, title or date..." onkeyup="filterCardsLive(this.value)">
-            </div>
-            <div class="filters">
-                <select name="sem" onchange="this.form.submit()">{ "".join(f'<option value="{s}" {"selected" if s == sem else ""}>{s}</option>' for s in SEMESTERS) }</select>
-            </div>
-        </form>
-        """
-
-        cards_html = ""
-        if not records:
-            cards_html = f'<div class="card" style="text-align:center; padding:40px;"><p style="color:var(--text-muted);">No documents found in this folder.</p></div>'
-        else:
-            cards_html = '<div class="cards-layout-grid">'
-            for item_id, title, c, s, y, r_type, url_or_name, size, item_cat in records:
-                safe_title_view = title.replace("'", "\\'")
-                if r_type == "pdf":
-                    action_btn = f"""
-                    <div style="margin-top: 10px;">
-                        <button class="btn-pill" onclick="openPdfViewer('/view/{item_id}', '{safe_title_view}')">View PDF</button>
-                    </div>
-                    """
-                else:
-                    action_btn = f'<div style="margin-top: 10px;"><a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">🔗 Open Link</a></div>'
-
-                admin_opts = ""
-                if is_admin:
-                    safe_title = title.replace("'", "\\'")
-                    safe_c = c.replace("'", "\\'")
-                    admin_opts = f"""
-                    <div class="admin-actions">
-                        <button class="edit-btn" onclick="openEditModal({item_id}, '{safe_title}', '{safe_c}', '{s}', '{y}', '{item_cat}')">✎ Edit</button>
-                        <form action="/delete/{item_id}" method="POST" onsubmit="return confirm('Delete paper?');">
-                            <button type="submit" class="del-btn">✕</button>
-                        </form>
-                    </div>
-                    """
-
-                card_search_data = f"{title.lower()} {c.lower()} {s.lower()} {y.lower()}"
-
-                cards_html += f"""
-                <div class="card card-item" data-search-text="{card_search_data}">
-                    <div>
-                        <div class="card-top">
-                            <span class="badge">{c}</span>
-                            {admin_opts}
-                        </div>
-                        <div class="card-title">{title}</div>
-                        <div class="card-meta">🎓 {s} &nbsp;•&nbsp; 📅 Filter/Date: {y} &nbsp;•&nbsp; 💾 {size}</div>
-                    </div>
-                    {action_btn}
-                </div>
-                """
-            cards_html += '</div>'
-
-        main_view_content = header_bar + search_filter_form + f'<div id="cards-container">{cards_html}</div>'
-
+    # Get resource counts grouped by course for this category
+    cursor.execute("SELECT course, COUNT(*) FROM du_resources WHERE category = ? GROUP BY course", (cat,))
+    course_counts = dict(cursor.fetchall())
     conn.close()
 
-    up_course_opts = "".join(f'<option value="{c}">{c}</option>' for c in COURSES[1:])
-    up_sem_opts = "".join(f'<option value="{s}">{s}</option>' for s in SEMESTERS[1:])
+    folders_html = ""
+    for tile in COURSE_TILES:
+        c_name = tile["name"]
+        count = course_counts.get(c_name, 0)
+        encoded_course = urllib.parse.quote(c_name)
+        folders_html += f"""
+        <a href="/folder/{cat}/{encoded_course}" class="folder-card">
+            <div class="folder-card-icon">{tile['icon']}</div>
+            <div class="folder-card-title">{tile['label']}</div>
+            <div class="folder-card-count">{count} items</div>
+        </a>
+        """
 
-    if is_admin:
-        admin_header_btn = '<a href="/logout" class="admin-lock-btn">Logout</a>'
-        admin_banner_html = '<div class="admin-banner"><span>🔓 Host Controls Unlocked</span><a href="/logout">Lock</a></div>'
-        fab_controls = """
-        <div class="fab-bar">
-            <button class="fab" onclick="openModal('uploadModal')">📁 Batch Upload</button>
-            <button class="fab" style="background: var(--caramel);" onclick="openModal('linkModal')">🔗 Add Link</button>
+    content = f"""
+    <div class="folder-header-bar">
+        <div class="folder-header-title">
+            <span>{cat_meta['icon']}</span>
+            <span>{cat_meta['name']}</span>
+        </div>
+        <a href="/" class="back-folder-btn">← Back Home</a>
+    </div>
+    <div class="folder-grid">
+        {folders_html}
+    </div>
+    """
+    return render_page(request, content)
+
+@app.get("/folder/{cat}/{course_path}", response_class=HTMLResponse)
+def view_folder(cat: str, course_path: str, request: Request):
+    course = urllib.parse.unquote(course_path)
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT id, title, course, semester, year, type, category, url_or_name, file_size
+        FROM du_resources 
+        WHERE category = ? AND course = ?
+        ORDER BY year DESC, title ASC
+    """, (cat, course))
+    
+    items = cursor.fetchall()
+    conn.close()
+
+    admin_active = is_admin(request)
+    cards_html = ""
+
+    for item in items:
+        item_id, title, c_course, sem, year, r_type, c_cat, url_or_name, file_size = item
+        
+        if r_type == "link":
+            action_btn = f'<a href="{url_or_name}" target="_blank" class="btn-pill btn-caramel">🔗 Open External Link</a>'
+        else:
+            action_btn = f'<button onclick="openPdfViewer(\'/view/{item_id}\', \'{title.replace("\'", "\\\'")}\')" class="btn-pill">📄 View Document</button>'
+
+        admin_tools = ""
+        if admin_active:
+            admin_tools = f"""
+            <div class="admin-actions">
+                <button class="edit-btn" onclick="openEditModal({item_id}, '{title.replace("\'", "\\\'")}', '{c_course.replace("\'", "\\\'")}', '{sem}', '{year}', '{c_cat}')">✏️ Edit</button>
+                <form action="/delete/{item_id}" method="POST" style="display:inline;" onsubmit="return confirm('Delete this resource?')">
+                    <button type="submit" class="del-btn" title="Delete Resource">🗑️</button>
+                </form>
+            </div>
+            """
+
+        cards_html += f"""
+        <div class="card" data-title="{title}" data-course="{c_course}" data-sem="{sem}">
+            <div>
+                <div class="card-top">
+                    <span class="badge">{sem} • {year or 'N/A'}</span>
+                    {admin_tools}
+                </div>
+                <div class="card-title">{title}</div>
+                <div class="card-meta">{c_course} {f"• {file_size}" if file_size else ""}</div>
+            </div>
+            <div style="margin-top: 12px;">
+                {action_btn}
+            </div>
         </div>
         """
-    else:
-        admin_header_btn = '<button onclick="openModal(\'loginModal\')" class="admin-lock-btn">🔒 Admin</button>'
-        admin_banner_html = ""
-        fab_controls = ""
 
-    content = HTML_TEMPLATE
-    content = content.replace("{main_view_content}", main_view_content)
-    content = content.replace("{upload_course_options}", up_course_opts)
-    content = content.replace("{upload_sem_options}", up_sem_opts)
-    content = content.replace("{admin_header_btn}", admin_header_btn)
-    content = content.replace("{admin_banner_html}", admin_banner_html)
-    content = content.replace("{fab_controls}", fab_controls)
+    if not items:
+        cards_html = """
+        <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: var(--text-muted);">
+            <p>No resources found in this folder yet.</p>
+        </div>
+        """
 
-    return HTMLResponse(content=content)
+    sem_options = "".join([f'<option value="{s}">{s}</option>' for s in SEMESTERS])
 
-@app.post("/login")
-def login(password: str = Form(...)):
-    if password == ADMIN_PASSWORD:
-        response = RedirectResponse(url="/", status_code=303)
-        response.set_cookie(key="du_admin_session", value="authenticated", httponly=True)
-        return response
-    return HTMLResponse("Invalid Password", status_code=401)
+    content = f"""
+    <div class="folder-header-bar">
+        <div class="folder-header-title">
+            <span>📚</span>
+            <span>{course}</span>
+        </div>
+        <a href="/category/{cat}" class="back-folder-btn">← Back to Category</a>
+    </div>
 
-@app.get("/logout")
-def logout():
-    response = RedirectResponse(url="/", status_code=303)
-    response.delete_cookie(key="du_admin_session")
-    return response
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="🔍 Search papers or topics..." onkeyup="filterCards()">
+    </div>
+
+    <div class="filters">
+        <select id="semFilter" onchange="filterCards()">
+            {sem_options}
+        </select>
+    </div>
+
+    <div class="cards-layout-grid">
+        {cards_html}
+    </div>
+    """
+    return render_page(request, content)
 
 @app.post("/upload")
-async def upload_files(
+async def handle_upload(
     request: Request,
     category: str = Form("pyq"),
     course: str = Form("auto"),
@@ -1310,29 +1210,57 @@ async def upload_files(
     year: str = Form(""),
     files: list[UploadFile] = File(...)
 ):
-    if request.cookies.get("du_admin_session") != "authenticated":
-        return HTMLResponse("Unauthorized. Please log in as Admin.", status_code=403)
+    if not is_admin(request):
+        return RedirectResponse(url="/", status_code=303)
 
     conn = get_db()
     cursor = conn.cursor()
-    last_detected_course = None
+
     for file in files:
-        if file.filename.lower().endswith(".pdf"):
-            data = await file.read()
-            size_mb = f"{len(data) / (1024 * 1024):.2f} MB"
-            clean_title, detected_course, detected_sem, detected_year = parse_filename(
-                file.filename, course, sem, year
-            )
-            last_detected_course = detected_course
-            cursor.execute("""
-                INSERT INTO du_resources (title, course, semester, year, type, category, url_or_name, file_data, file_size)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (clean_title, detected_course, detected_sem, detected_year, "pdf", category, file.filename, data, size_mb))
+        if not file.filename:
+            continue
+        
+        contents = await file.read()
+        size_kb = round(len(contents) / 1024, 1)
+        file_size_str = f"{size_kb} KB" if size_kb < 1024 else f"{round(size_kb/1024, 2)} MB"
+
+        auto_title, auto_course, auto_sem, auto_year = auto_detect_metadata(file.filename)
+
+        final_course = auto_course if course == "auto" else course
+        final_sem = auto_sem if sem == "auto" else sem
+        final_year = year.strip() if year.strip() else auto_year
+
+        cursor.execute("""
+            INSERT INTO du_resources (title, course, semester, year, type, category, url_or_name, file_data, file_size)
+            VALUES (?, ?, ?, ?, 'pdf', ?, ?, ?, ?)
+        """, (auto_title, final_course, final_sem, final_year, category, file.filename, contents, file_size_str))
+
     conn.commit()
     conn.close()
+    return RedirectResponse(url=f"/category/{category}", status_code=303)
 
-    redirect_url = f"/?cat={category}&course={urllib.parse.quote_plus(last_detected_course)}" if last_detected_course else f"/?cat={category}"
-    return RedirectResponse(url=redirect_url, status_code=303)
+@app.post("/add-link")
+def add_link(
+    request: Request,
+    category: str = Form("timetable"),
+    title: str = Form(...),
+    url: str = Form(...),
+    course: str = Form(...),
+    sem: str = Form(...)
+):
+    if not is_admin(request):
+        return RedirectResponse(url="/", status_code=303)
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO du_resources (title, course, semester, year, type, category, url_or_name)
+        VALUES (?, ?, ?, '2024', 'link', ?, ?)
+    """, (title, course, sem, category, url))
+    
+    conn.commit()
+    conn.close()
+    return RedirectResponse(url=f"/category/{category}", status_code=303)
 
 @app.post("/edit-item")
 def edit_item(
@@ -1344,8 +1272,8 @@ def edit_item(
     year: str = Form(...),
     category: str = Form("pyq")
 ):
-    if request.cookies.get("du_admin_session") != "authenticated":
-        return HTMLResponse("Unauthorized.", status_code=403)
+    if not is_admin(request):
+        return RedirectResponse(url="/", status_code=303)
 
     conn = get_db()
     cursor = conn.cursor()
@@ -1354,64 +1282,54 @@ def edit_item(
         SET title = ?, course = ?, semester = ?, year = ?, category = ?
         WHERE id = ?
     """, (title, course, sem, year, category, item_id))
+    
     conn.commit()
     conn.close()
+    return RedirectResponse(url=f"/category/{category}", status_code=303)
 
-    return RedirectResponse(url=f"/?cat={category}&course={urllib.parse.quote_plus(course)}", status_code=303)
-
-@app.post("/add-link")
-def add_link(
-    request: Request,
-    title: str = Form(...),
-    url: str = Form(...),
-    course: str = Form(...),
-    sem: str = Form(...),
-    category: str = Form("timetable")
-):
-    if request.cookies.get("du_admin_session") != "authenticated":
-        return HTMLResponse("Unauthorized.", status_code=403)
+@app.post("/delete/{item_id}")
+def delete_item(item_id: int, request: Request):
+    if not is_admin(request):
+        return RedirectResponse(url="/", status_code=303)
 
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO du_resources (title, course, semester, year, type, category, url_or_name, file_data, file_size)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (title, course, sem, "External", "link", category, url, None, "Link"))
+    cursor.execute("SELECT category FROM du_resources WHERE id = ?", (item_id,))
+    res = cursor.fetchone()
+    cat = res[0] if res else "pyq"
+
+    cursor.execute("DELETE FROM du_resources WHERE id = ?", (item_id,))
     conn.commit()
     conn.close()
-    return RedirectResponse(url=f"/?cat={category}", status_code=303)
+    return RedirectResponse(url=f"/category/{cat}", status_code=303)
 
 @app.get("/view/{item_id}")
 def view_pdf(item_id: int):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT title, file_data FROM du_resources WHERE id = ?", (item_id,))
-    row = cursor.fetchone()
+    cursor.execute("SELECT file_data, url_or_name FROM du_resources WHERE id = ?", (item_id,))
+    res = cursor.fetchone()
     conn.close()
-    if row and row[1]:
-        return StreamingResponse(
-            io.BytesIO(row[1]),
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f'inline; filename="{row[0]}.pdf"',
-                "X-Content-Type-Options": "nosniff",
-                "Cache-Control": "public, max-age=604800, immutable"
-            }
-        )
-    return HTMLResponse("Not Found", status_code=404)
 
-@app.post("/delete/{item_id}")
-def delete_item(request: Request, item_id: int):
-    if request.cookies.get("du_admin_session") != "authenticated":
-        return HTMLResponse("Unauthorized.", status_code=403)
+    if not res or not res[0]:
+        return Response(content="File Not Found", status_code=404)
 
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM du_resources WHERE id = ?", (item_id,))
-    conn.commit()
-    conn.close()
-    return RedirectResponse(url="/", status_code=303)
+    file_bytes, filename = res
+    headers = {
+        "Content-Disposition": f"inline; filename=\"{filename or 'document.pdf'}\"",
+        "Cache-Control": "public, max-age=31536000, immutable"
+    }
+    return StreamingResponse(io.BytesIO(file_bytes), media_type="application/pdf", headers=headers)
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.post("/login")
+def login(password: str = Form(...)):
+    response = RedirectResponse(url="/", status_code=303)
+    if password == ADMIN_PASSWORD:
+        response.set_cookie(key="vault_admin", value="1", max_age=86400 * 30, httponly=True)
+    return response
+
+@app.get("/logout")
+def logout():
+    response = RedirectResponse(url="/", status_code=303)
+    response.delete_cookie(key="vault_admin")
+    return response
