@@ -51,18 +51,10 @@ COURSE_TILES = [
     {"name": "B.Sc (Hons) Computer Science", "icon": "💻", "label": "Computer Sci"},
     {"name": "B.Com (Hons)", "icon": "📊", "label": "B.Com (H)"},
     {"name": "B.A. (Hons) Economics", "icon": "📈", "label": "Economics"},
-    {"name": "B.A. Programme", "icon": "📚", "label": "B.A. Prog"},
     {"name": "B.Sc (prog) Physical science with Chemistry", "icon": "🧲", "label": "Physical science with chem"}
 ]
 
 SEMESTERS = ["All Semesters", "Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 6"]
-
-CATEGORY_MAP = {
-    "pyq": {"label": "📄 PYQs", "icon": "📄", "name": "Previous Year Questions"},
-    "notes": {"label": "📝 Notes", "icon": "📝", "name": "Notes & Study Material"},
-    "practical": {"label": "🔬 Practical", "icon": "🔬", "name": "Practical Files & Lab Manuals"},
-    "timetable": {"label": "📅 Timetable", "icon": "📅", "name": "Timetables & Schedules"}
-}
 
 def init_db():
     conn = get_db()
@@ -75,22 +67,18 @@ def init_db():
             semester TEXT NOT NULL,
             year TEXT,
             type TEXT NOT NULL,
-            category TEXT DEFAULT 'pyq',
             url_or_name TEXT,
             file_data BLOB,
             file_size TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    try:
-        cursor.execute("ALTER TABLE du_resources ADD COLUMN category TEXT DEFAULT 'pyq'")
-    except Exception:
-        pass
     conn.commit()
     conn.close()
 
 init_db()
 
+# --- PWA Manifest & Assets ---
 PWA_MANIFEST = """{
   "name": "DU PYQ Vault",
   "short_name": "DU Vault",
@@ -124,7 +112,7 @@ PWA_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" 
   <text x="256" y="365" font-family="sans-serif" font-size="34" letter-spacing="4" font-weight="bold" fill="#1E1A17" text-anchor="middle">VAULT</text>
 </svg>"""
 
-SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v16';
+SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v15';
 const PRECACHE = [
   '/', 
   '/manifest.json', 
@@ -204,7 +192,7 @@ HTML_TEMPLATE = """
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
     <style>
-        :root {{
+        :root {
             --espresso: #1E1A17;
             --caramel: #A77A53;
             --bg-latte: #E8DDD1;
@@ -212,15 +200,16 @@ HTML_TEMPLATE = """
             --border-latte: #D8C7B6;
             --text-dark: #261E19;
             --text-muted: #7E6A5B;
-        }}
-        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-        body {{
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
             font-family: 'Inter', sans-serif;
             background-color: var(--bg-latte);
             color: var(--text-dark);
             padding-bottom: 90px;
-        }}
+        }
 
+        /* Suppress Host / Render Free Tier Ad Badge Overlays */
         [data-render-badge],
         div[class*="render-badge"],
         div[id*="render-badge"],
@@ -228,7 +217,7 @@ HTML_TEMPLATE = """
         a[href*="render.com"][style*="fixed"],
         a[href*="render.com"][style*="absolute"],
         a[href*="render.com"][class*="badge"],
-        div[style*="z-index"][style*="fixed"] a[href*="render.com"] {{
+        div[style*="z-index"][style*="fixed"] a[href*="render.com"] {
             display: none !important;
             visibility: hidden !important;
             pointer-events: none !important;
@@ -238,9 +227,10 @@ HTML_TEMPLATE = """
             position: absolute !important;
             left: -9999px !important;
             top: -9999px !important;
-        }}
+        }
 
-        #loading-screen {{
+        /* Loading Screen */
+        #loading-screen {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
             background: radial-gradient(circle at center, #2B231D 0%, #151210 100%);
@@ -250,13 +240,13 @@ HTML_TEMPLATE = """
             align-items: center;
             justify-content: center;
             transition: opacity 0.3s ease, visibility 0.3s ease;
-        }}
-        #loading-screen.fade-out {{
+        }
+        #loading-screen.fade-out {
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
-        }}
-        .loader-box {{
+        }
+        .loader-box {
             position: relative;
             width: 90px;
             height: 90px;
@@ -264,8 +254,8 @@ HTML_TEMPLATE = """
             align-items: center;
             justify-content: center;
             margin-bottom: 16px;
-        }}
-        .loader-ring {{
+        }
+        .loader-ring {
             position: absolute;
             width: 100%;
             height: 100%;
@@ -273,8 +263,8 @@ HTML_TEMPLATE = """
             border: 3px solid rgba(167, 122, 83, 0.2);
             border-top: 3px solid var(--caramel);
             animation: spinRing 1s cubic-bezier(0.55, 0.055, 0.675, 0.19) infinite;
-        }}
-        .loader-logo {{
+        }
+        .loader-logo {
             width: 56px;
             height: 56px;
             background: var(--caramel);
@@ -288,25 +278,25 @@ HTML_TEMPLATE = """
             font-size: 1.3rem;
             box-shadow: 0 4px 18px rgba(167, 122, 83, 0.35);
             animation: pulseLogo 1.6s ease-in-out infinite alternate;
-        }}
-        .loader-text {{
+        }
+        .loader-text {
             color: #FAF6F2;
             font-family: 'Georgia', serif;
             font-size: 1rem;
             letter-spacing: 1px;
-        }}
-        .loader-subtext {{
+        }
+        .loader-subtext {
             color: #A77A53;
             font-size: 0.72rem;
             letter-spacing: 1.5px;
             text-transform: uppercase;
             font-weight: 600;
             margin-top: 6px;
-        }}
-        @keyframes spinRing {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
-        @keyframes pulseLogo {{ 0% {{ transform: scale(0.94); }} 100% {{ transform: scale(1.05); }} }}
+        }
+        @keyframes spinRing { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulseLogo { 0% { transform: scale(0.94); } 100% { transform: scale(1.05); } }
 
-        header {{
+        header {
             background: var(--espresso);
             color: #FAF6F2;
             padding: 14px 24px;
@@ -314,41 +304,41 @@ HTML_TEMPLATE = """
             display: flex;
             align-items: center;
             justify-content: space-between;
-        }}
-        .brand-title {{ 
+        }
+        .brand-title { 
             font-family: 'Georgia', serif; 
             font-size: 1.25rem; 
             font-weight: bold; 
             letter-spacing: 0.5px;
             text-decoration: none;
             color: #FAF6F2;
-        }}
-        .brand-right {{
+        }
+        .brand-right {
             display: flex;
             align-items: center;
             gap: 16px;
-        }}
-        .founder-tag {{
+        }
+        .founder-tag {
             font-family: 'Georgia', serif;
             font-size: 0.9rem;
             color: #FAF6F2;
             text-align: right;
             line-height: 1.2;
-        }}
-        .founder-tag span.founder-name {{
+        }
+        .founder-tag span.founder-name {
             color: var(--caramel);
             font-weight: 700;
             font-size: 0.95rem;
-        }}
-        .college-subtag {{
+        }
+        .college-subtag {
             font-size: 0.52rem;
             color: #BFA898;
             font-family: 'Inter', sans-serif;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             display: block;
-        }}
-        .admin-lock-btn {{
+        }
+        .admin-lock-btn {
             background: transparent;
             border: 1px solid rgba(255,255,255,0.25);
             color: #FAF6F2;
@@ -357,8 +347,8 @@ HTML_TEMPLATE = """
             font-size: 0.75rem;
             cursor: pointer;
             text-decoration: none;
-        }}
-        .admin-banner {{
+        }
+        .admin-banner {
             background: #D4A373;
             color: #1E1A17;
             padding: 8px 24px;
@@ -367,51 +357,23 @@ HTML_TEMPLATE = """
             display: flex;
             justify-content: space-between;
             align-items: center;
-        }}
-        .admin-banner a {{ color: #641E16; text-decoration: underline; cursor: pointer; }}
+        }
+        .admin-banner a { color: #641E16; text-decoration: underline; cursor: pointer; }
         
-        .container {{ 
+        .container { 
             width: 100%;
             max-width: 1100px; 
             margin: 0 auto; 
             padding: 20px 16px; 
-        }}
+        }
 
-        .category-grid {{
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
-            margin: 20px 0;
-        }}
-        .category-card {{
-            text-decoration: none;
-            color: var(--text-dark);
-            background: var(--card-foam);
-            border: 2px solid var(--border-latte);
-            border-radius: 20px;
-            padding: 28px 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-        }}
-        .category-card:hover {{
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-            border-color: var(--caramel);
-        }}
-        .category-icon {{ font-size: 3rem; margin-bottom: 10px; }}
-        .category-title {{ font-family: 'Georgia', serif; font-size: 1.25rem; font-weight: 700; text-align: center; }}
-
-        .folder-grid {{
+        .folder-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 14px;
             margin: 14px 0 24px 0;
-        }}
-        .folder-card {{
+        }
+        .folder-card {
             text-decoration: none;
             color: var(--text-dark);
             background: var(--card-foam);
@@ -423,17 +385,17 @@ HTML_TEMPLATE = """
             align-items: center;
             box-shadow: 0 2px 6px rgba(0,0,0,0.04);
             transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }}
-        .folder-card:hover {{
+        }
+        .folder-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 14px rgba(0,0,0,0.08);
             border-color: var(--caramel);
-        }}
-        .folder-card-icon {{ font-size: 2.4rem; margin-bottom: 8px; }}
-        .folder-card-title {{ font-size: 0.88rem; font-weight: 700; text-align: center; }}
-        .folder-card-count {{ font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }}
+        }
+        .folder-card-icon { font-size: 2.4rem; margin-bottom: 8px; }
+        .folder-card-title { font-size: 0.88rem; font-weight: 700; text-align: center; }
+        .folder-card-count { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
 
-        .folder-header-bar {{
+        .folder-header-bar {
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -442,16 +404,16 @@ HTML_TEMPLATE = """
             border-radius: 16px;
             padding: 16px 20px;
             margin-bottom: 16px;
-        }}
-        .folder-header-title {{
+        }
+        .folder-header-title {
             display: flex;
             align-items: center;
             gap: 12px;
             font-family: 'Georgia', serif;
             font-size: 1.2rem;
             font-weight: bold;
-        }}
-        .back-folder-btn {{
+        }
+        .back-folder-btn {
             background: var(--espresso);
             color: #FAF6F2;
             text-decoration: none;
@@ -459,80 +421,81 @@ HTML_TEMPLATE = """
             border-radius: 12px;
             font-size: 0.82rem;
             font-weight: 600;
-        }}
+        }
 
-        .search-box input {{
+        .search-box input {
             width: 100%; padding: 12px 20px; border-radius: 25px;
             border: 1px solid var(--border-latte); background: var(--card-foam);
             font-size: 0.95rem; outline: none; margin-bottom: 12px;
-        }}
-        .filters {{ display: flex; gap: 10px; margin-bottom: 16px; }}
-        select {{
+        }
+        .filters { display: flex; gap: 10px; margin-bottom: 16px; }
+        select {
             flex: 1; padding: 11px 14px; border-radius: 18px;
             border: 1px solid var(--border-latte); background: var(--card-foam);
             font-size: 0.88rem; outline: none;
-        }}
+        }
 
-        .cards-layout-grid {{
+        .cards-layout-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 14px;
-        }}
-        .card {{
+        }
+        .card {
             background: var(--card-foam); border: 1px solid var(--border-latte);
             border-radius: 18px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between;
-        }}
-        .card-top {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }}
-        .badge {{ font-size: 0.78rem; font-weight: 700; color: var(--caramel); }}
-        .admin-actions {{ display: flex; gap: 8px; align-items: center; }}
-        .edit-btn {{ background: none; border: none; color: var(--caramel); font-size: 0.85rem; cursor: pointer; font-weight: 600; }}
-        .del-btn {{ background: none; border: none; color: #BA1A1A; font-size: 1.1rem; cursor: pointer; padding: 0 4px; }}
+        }
+        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .badge { font-size: 0.78rem; font-weight: 700; color: var(--caramel); }
+        .admin-actions { display: flex; gap: 8px; align-items: center; }
+        .edit-btn { background: none; border: none; color: var(--caramel); font-size: 0.85rem; cursor: pointer; font-weight: 600; }
+        .del-btn { background: none; border: none; color: #BA1A1A; font-size: 1.1rem; cursor: pointer; padding: 0 4px; }
         
-        .card-title {{ font-family: 'Georgia', serif; font-size: 1.05rem; font-weight: bold; margin-bottom: 6px; }}
-        .card-meta {{ font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px; }}
-        .btn-pill {{
+        .card-title { font-family: 'Georgia', serif; font-size: 1.05rem; font-weight: bold; margin-bottom: 6px; }
+        .card-meta { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px; }
+        .btn-pill {
             display: inline-block; text-align: center; width: 100%; padding: 10px 0;
             background: var(--espresso); color: #FAF6F2; text-decoration: none;
             font-size: 0.88rem; font-weight: 600; border-radius: 20px; border: none; cursor: pointer;
-        }}
-        .btn-caramel {{ background: var(--caramel); }}
-        .fab-bar {{
+        }
+        .btn-caramel { background: var(--caramel); }
+        .fab-bar {
             position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
             display: flex; gap: 12px; z-index: 100;
-        }}
-        .fab {{
+        }
+        .fab {
             padding: 13px 22px; border-radius: 30px; background: var(--espresso);
             color: #FAF6F2; border: none; font-size: 0.92rem; font-weight: 600;
             box-shadow: 0 4px 16px rgba(0,0,0,0.25); cursor: pointer;
-        }}
-        .modal {{
+        }
+        .modal {
             display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(30,26,23,0.65); z-index: 200; align-items: center; justify-content: center;
-        }}
-        .modal.active {{ display: flex; }}
-        .modal-content {{
+        }
+        .modal.active { display: flex; }
+        .modal-content {
             background: var(--card-foam); width: 92%; max-width: 520px;
             border-radius: 20px; padding: 26px; max-height: 88vh; overflow-y: auto;
-        }}
-        .modal-title {{ font-family: 'Georgia', serif; font-size: 1.25rem; font-weight: bold; margin-bottom: 14px; }}
-        .form-group {{ margin-bottom: 14px; }}
-        .form-group label {{ display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 5px; }}
-        .form-group input, .form-group select {{
+        }
+        .modal-title { font-family: 'Georgia', serif; font-size: 1.25rem; font-weight: bold; margin-bottom: 14px; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 5px; }
+        .form-group input, .form-group select {
             width: 100%; padding: 11px; border-radius: 12px;
             border: 1px solid var(--border-latte); background: var(--bg-latte); outline: none;
-        }}
-        .helper-text {{ font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; }}
+        }
+        .helper-text { font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; }
 
-        #pdfViewerModal {{
+        /* Fullscreen In-App PDF Viewer */
+        #pdfViewerModal {
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
             background: #14110E;
             z-index: 99999;
             flex-direction: column;
-        }}
-        #pdfViewerModal.active {{ display: flex; }}
-        .pdf-viewer-header {{
+        }
+        #pdfViewerModal.active { display: flex; }
+        .pdf-viewer-header {
             background: var(--espresso);
             color: #FAF6F2;
             padding: 12px 20px;
@@ -541,8 +504,8 @@ HTML_TEMPLATE = """
             justify-content: space-between;
             border-bottom: 1px solid rgba(255,255,255,0.1);
             gap: 12px;
-        }}
-        .pdf-viewer-title {{
+        }
+        .pdf-viewer-title {
             font-family: 'Georgia', serif;
             font-size: 0.95rem;
             font-weight: 600;
@@ -550,20 +513,20 @@ HTML_TEMPLATE = """
             overflow: hidden;
             text-overflow: ellipsis;
             max-width: 55%;
-        }}
-        .pdf-toolbar {{
+        }
+        .pdf-toolbar {
             display: flex;
             align-items: center;
             gap: 10px;
-        }}
-        .zoom-controls {{
+        }
+        .zoom-controls {
             display: flex;
             background: rgba(255,255,255,0.08);
             border-radius: 14px;
             padding: 2px;
             border: 1px solid rgba(255,255,255,0.15);
-        }}
-        .zoom-btn {{
+        }
+        .zoom-btn {
             background: transparent;
             color: #FAF6F2;
             border: none;
@@ -573,10 +536,10 @@ HTML_TEMPLATE = """
             font-weight: 700;
             cursor: pointer;
             transition: background 0.15s ease;
-        }}
-        .zoom-btn:hover {{ background: rgba(255,255,255,0.15); }}
-        .zoom-btn:active {{ background: var(--caramel); }}
-        .zoom-level-text {{
+        }
+        .zoom-btn:hover { background: rgba(255,255,255,0.15); }
+        .zoom-btn:active { background: var(--caramel); }
+        .zoom-level-text {
             color: #D8C7B6;
             font-size: 0.78rem;
             font-weight: 600;
@@ -585,8 +548,8 @@ HTML_TEMPLATE = """
             align-items: center;
             min-width: 48px;
             justify-content: center;
-        }}
-        .pdf-close-btn {{
+        }
+        .pdf-close-btn {
             background: var(--caramel);
             color: #FAF6F2;
             border: none;
@@ -595,8 +558,8 @@ HTML_TEMPLATE = """
             font-size: 0.82rem;
             font-weight: 700;
             cursor: pointer;
-        }}
-        #pdf-scroll-container {{
+        }
+        #pdf-scroll-container {
             flex: 1;
             overflow: auto;
             background: #1E1A17;
@@ -607,27 +570,27 @@ HTML_TEMPLATE = """
             -webkit-overflow-scrolling: touch;
             user-select: none;
             -webkit-user-select: none;
-        }}
-        .pdf-canvas-wrap {{
+        }
+        .pdf-canvas-wrap {
             margin: 0 auto 16px auto;
             box-shadow: 0 4px 20px rgba(0,0,0,0.6);
             border-radius: 4px;
             background: #FFFFFF;
             line-height: 0;
-        }}
-        .pdf-page-canvas {{
+        }
+        .pdf-page-canvas {
             display: block;
             border-radius: 4px;
-            pointer-events: none;
-        }}
-        .pdf-spinner {{
+            pointer-events: none; /* Prevents long-press image saving on mobile */
+        }
+        .pdf-spinner {
             width: 44px; height: 44px;
             border: 3px solid rgba(167, 122, 83, 0.25);
             border-top: 3px solid var(--caramel);
             border-radius: 50%;
             animation: spinRing 0.9s linear infinite;
             margin-bottom: 14px;
-        }}
+        }
     </style>
 </head>
 <body>
@@ -660,9 +623,10 @@ HTML_TEMPLATE = """
 
 {fab_controls}
 
+<!-- Native In-App PDF Viewing Stage (Protected Canvas) -->
 <div id="pdfViewerModal">
     <div class="pdf-viewer-header">
-        <div class="pdf-viewer-title" id="pdfModalTitle">Viewing Document</div>
+        <div class="pdf-viewer-title" id="pdfModalTitle">Viewing Paper</div>
         <div class="pdf-toolbar">
             <div class="zoom-controls">
                 <button class="zoom-btn" onclick="adjustZoom(-0.25)" title="Zoom Out">-</button>
@@ -670,31 +634,24 @@ HTML_TEMPLATE = """
                 <button class="zoom-btn" onclick="adjustZoom(0.25)" title="Zoom In">+</button>
                 <button class="zoom-btn" onclick="resetZoom()" title="Fit to Screen" style="border-left: 1px solid rgba(255,255,255,0.15);">⟲</button>
             </div>
-            <button class="pdf-close-btn" onclick="closePdfViewer()">✕ Back</button>
+            <button class="pdf-close-btn" onclick="closePdfViewer()">✕ Back to Folder</button>
         </div>
     </div>
     <div id="pdf-scroll-container" oncontextmenu="return false;"></div>
 </div>
 
+<!-- BATCH UPLOAD MODAL -->
 <div class="modal" id="uploadModal" onclick="if(event.target === this) closeModal('uploadModal')">
     <div class="modal-content">
         <div class="modal-title">Batch Upload PDFs</div>
         <form action="/upload" method="POST" enctype="multipart/form-data" onsubmit="showLoader()">
-            <div class="form-group">
-                <label>Resource Section</label>
-                <select name="category">
-                    <option value="pyq">📄 PYQs</option>
-                    <option value="notes">📝 Notes</option>
-                    <option value="practical">🔬 Practical</option>
-                    <option value="timetable">📅 Timetable</option>
-                </select>
-            </div>
             <div class="form-group">
                 <label>Course Categorization</label>
                 <select name="course">
                     <option value="auto">⚡ Auto-Detect from Filename</option>
                     {upload_course_options}
                 </select>
+                <div class="helper-text">Botany, Zoology, Physics, CS papers auto-sort into their respective folders.</div>
             </div>
             <div class="form-group">
                 <label>Semester</label>
@@ -702,65 +659,52 @@ HTML_TEMPLATE = """
                     <option value="auto">⚡ Auto-Detect from Filename</option>
                     {upload_sem_options}
                 </select>
+                <div class="helper-text">Detects "Sem 1", "Sem 3", "Semester 6", etc. in names.</div>
             </div>
             <div class="form-group">
-                <label>Exam Year / Date</label>
+                <label>Exam Year</label>
                 <input type="text" name="year" placeholder="e.g. 2024 or leave blank for Auto">
+                <div class="helper-text">Detects 4-digit years (e.g. 2022, 2023) if left blank.</div>
             </div>
             <div class="form-group">
                 <label>Select All PDF Files</label>
                 <input type="file" name="files" accept="application/pdf" multiple required>
             </div>
-            <button type="submit" class="btn-pill" style="margin-top: 10px;">Upload Batch</button>
+            <button type="submit" class="btn-pill" style="margin-top: 10px;">Upload Entire Batch</button>
         </form>
     </div>
 </div>
 
+<!-- LINK MODAL -->
 <div class="modal" id="linkModal" onclick="if(event.target === this) closeModal('linkModal')">
     <div class="modal-content">
-        <div class="modal-title">Add Reference / External Link</div>
+        <div class="modal-title">Add Reference Link</div>
         <form action="/add-link" method="POST">
-            <div class="form-group">
-                <label>Resource Section</label>
-                <select name="category">
-                    <option value="timetable">📅 Timetable (External Link 🔗)</option>
-                    <option value="pyq">📄 PYQs</option>
-                    <option value="notes">📝 Notes</option>
-                    <option value="practical">🔬 Practical</option>
-                </select>
-            </div>
-            <div class="form-group"><label>Title</label><input type="text" name="title" placeholder="e.g. Official DU Timetable Link" required></div>
+            <div class="form-group"><label>Title</label><input type="text" name="title" placeholder="e.g. Official Syllabus" required></div>
             <div class="form-group"><label>URL</label><input type="url" name="url" placeholder="https://..." required></div>
             <div class="form-group"><label>Course</label><select name="course" required>{upload_course_options}</select></div>
             <div class="form-group"><label>Semester</label><select name="sem" required>{upload_sem_options}</select></div>
-            <button type="submit" class="btn-pill btn-caramel" style="margin-top: 8px;">Save External Link</button>
+            <button type="submit" class="btn-pill btn-caramel" style="margin-top: 8px;">Save Link</button>
         </form>
     </div>
 </div>
 
+<!-- EDIT ITEM MODAL -->
 <div class="modal" id="editModal" onclick="if(event.target === this) closeModal('editModal')">
     <div class="modal-content">
         <div class="modal-title">Edit Resource Details</div>
         <form action="/edit-item" method="POST" onsubmit="showLoader()">
             <input type="hidden" name="item_id" id="edit_item_id">
-            <div class="form-group">
-                <label>Resource Section</label>
-                <select name="category" id="edit_category">
-                    <option value="pyq">📄 PYQs</option>
-                    <option value="notes">📝 Notes</option>
-                    <option value="practical">🔬 Practical</option>
-                    <option value="timetable">📅 Timetable</option>
-                </select>
-            </div>
             <div class="form-group"><label>Title</label><input type="text" name="title" id="edit_title" required></div>
             <div class="form-group"><label>Course</label><select name="course" id="edit_course">{upload_course_options}</select></div>
             <div class="form-group"><label>Semester</label><select name="sem" id="edit_sem">{upload_sem_options}</select></div>
-            <div class="form-group"><label>Year / Date</label><input type="text" name="year" id="edit_year" required></div>
+            <div class="form-group"><label>Exam Year</label><input type="text" name="year" id="edit_year" required></div>
             <button type="submit" class="btn-pill" style="margin-top: 8px;">Save Changes</button>
         </form>
     </div>
 </div>
 
+<!-- LOGIN MODAL -->
 <div class="modal" id="loginModal" onclick="if(event.target === this) closeModal('loginModal')">
     <div class="modal-content">
         <div class="modal-title">Host Admin Access</div>
@@ -775,38 +719,38 @@ HTML_TEMPLATE = """
 </div>
 
 <script>
-    if (window.pdfjsLib) {{
+    if (window.pdfjsLib) {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }}
+    }
 
-    function openModal(id) {{ document.getElementById(id).classList.add('active'); }}
-    function closeModal(id) {{ document.getElementById(id).classList.remove('active'); }}
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
-    function showLoader() {{
+    function showLoader() {
         const loader = document.getElementById('loading-screen');
         if (loader) loader.classList.remove('fade-out');
-    }}
+    }
 
-    function hideLoader() {{
+    function hideLoader() {
         const loader = document.getElementById('loading-screen');
         if (loader) loader.classList.add('fade-out');
-    }}
+    }
 
-    window.addEventListener('load', () => {{ setTimeout(hideLoader, 200); }});
+    window.addEventListener('load', () => { setTimeout(hideLoader, 200); });
 
-    document.addEventListener('DOMContentLoaded', () => {{
-        const triggers = document.querySelectorAll('a.folder-card, a.category-card, a.back-folder-btn');
-        triggers.forEach(el => {{
-            el.addEventListener('click', (e) => {{
-                if (!e.ctrlKey && !e.metaKey && !el.target) {{ showLoader(); }}
-            }});
-        }});
-    }});
+    document.addEventListener('DOMContentLoaded', () => {
+        const triggers = document.querySelectorAll('a.folder-card, a.back-folder-btn');
+        triggers.forEach(el => {
+            el.addEventListener('click', (e) => {
+                if (!e.ctrlKey && !e.metaKey && !el.target) { showLoader(); }
+            });
+        });
+    });
 
     let activePdfDoc = null;
     let currentZoomMultiplier = 1.0;
 
-    async function openPdfViewer(url, title) {{
+    async function openPdfViewer(url, title) {
         document.getElementById('pdfModalTitle').innerText = title;
         currentZoomMultiplier = 1.0;
         updateZoomDisplay();
@@ -819,23 +763,23 @@ HTML_TEMPLATE = """
             </div>
         `;
         document.getElementById('pdfViewerModal').classList.add('active');
-        history.pushState({{ pdfOpen: true }}, '');
+        history.pushState({ pdfOpen: true }, '');
 
-        try {{
+        try {
             const loadingTask = pdfjsLib.getDocument(url);
             activePdfDoc = await loadingTask.promise;
             await renderPdfPages();
-        }} catch (err) {{
+        } catch (err) {
             console.error(err);
             container.innerHTML = `
                 <div style="color: #FAF6F2; padding: 40px 20px; text-align: center;">
                     <p>Failed to load document preview.</p>
                 </div>
             `;
-        }}
-    }}
+        }
+    }
 
-    async function renderPdfPages() {{
+    async function renderPdfPages() {
         if (!activePdfDoc) return;
         const container = document.getElementById('pdf-scroll-container');
         container.innerHTML = '';
@@ -843,411 +787,379 @@ HTML_TEMPLATE = """
         const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
         const availableWidth = Math.min(window.innerWidth - 32, 950);
 
-        for (let pageNum = 1; pageNum <= activePdfDoc.numPages; pageNum++) {{
+        for (let pageNum = 1; pageNum <= activePdfDoc.numPages; pageNum++) {
             const page = await activePdfDoc.getPage(pageNum);
             
-            const unscaledViewport = page.getViewport({{ scale: 1.0 }});
+            const unscaledViewport = page.getViewport({ scale: 1.0 });
             const baseScale = availableWidth / unscaledViewport.width;
             const finalScale = baseScale * currentZoomMultiplier;
 
-            const cssViewport = page.getViewport({{ scale: finalScale }});
-            const highResViewport = page.getViewport({{ scale: finalScale * dpr }});
+            const cssViewport = page.getViewport({ scale: finalScale });
+            const highResViewport = page.getViewport({ scale: finalScale * dpr });
 
-            const canvasWrap = document.createElement('div');
-            canvasWrap.className = 'pdf-canvas-wrap';
+            const wrap = document.createElement('div');
+            wrap.className = 'pdf-canvas-wrap';
 
             const canvas = document.createElement('canvas');
             canvas.className = 'pdf-page-canvas';
-            canvas.height = highResViewport.height;
-            canvas.width = highResViewport.width;
-            canvas.style.width = cssViewport.width + 'px';
-            canvas.style.height = cssViewport.height + 'px';
-
-            canvasWrap.appendChild(canvas);
-            container.appendChild(canvasWrap);
-
             const context = canvas.getContext('2d');
-            await page.render({{
+
+            canvas.width = Math.floor(highResViewport.width);
+            canvas.height = Math.floor(highResViewport.height);
+
+            canvas.style.width = Math.floor(cssViewport.width) + 'px';
+            canvas.style.height = Math.floor(cssViewport.height) + 'px';
+
+            wrap.appendChild(canvas);
+            container.appendChild(wrap);
+
+            await page.render({
                 canvasContext: context,
                 viewport: highResViewport
-            }}).promise;
-        }}
-    }}
+            }).promise;
+        }
+    }
 
-    function adjustZoom(delta) {{
-        currentZoomMultiplier = Math.max(0.5, Math.min(3.0, currentZoomMultiplier + delta));
-        updateZoomDisplay();
-        renderPdfPages();
-    }}
+    function updateZoomDisplay() {
+        const display = document.getElementById('zoomLevelDisplay');
+        if (display) {
+            display.innerText = Math.round(currentZoomMultiplier * 100) + '%';
+        }
+    }
 
-    function resetZoom() {{
+    function adjustZoom(delta) {
+        const nextZoom = currentZoomMultiplier + delta;
+        if (nextZoom >= 0.5 && nextZoom <= 3.0) {
+            currentZoomMultiplier = Math.round(nextZoom * 100) / 100;
+            updateZoomDisplay();
+            renderPdfPages();
+        }
+    }
+
+    function resetZoom() {
         currentZoomMultiplier = 1.0;
         updateZoomDisplay();
         renderPdfPages();
-    }}
+    }
 
-    function updateZoomDisplay() {{
-        const el = document.getElementById('zoomLevelDisplay');
-        if (el) el.innerText = Math.round(currentZoomMultiplier * 100) + '%';
-    }}
+    function closePdfViewer(isPopState = false) {
+        const viewer = document.getElementById('pdfViewerModal');
+        if (viewer.classList.contains('active')) {
+            viewer.classList.remove('active');
+            document.getElementById('pdf-scroll-container').innerHTML = '';
+            activePdfDoc = null;
+            if (!isPopState && history.state && history.state.pdfOpen) {
+                history.back();
+            }
+        }
+    }
 
-    function closePdfViewer() {{
-        document.getElementById('pdfViewerModal').classList.remove('active');
-        activePdfDoc = null;
-        if (history.state && history.state.pdfOpen) {{
-            history.back();
-        }}
-    }}
+    window.addEventListener('popstate', (e) => {
+        const viewer = document.getElementById('pdfViewerModal');
+        if (viewer && viewer.classList.contains('active')) {
+            closePdfViewer(true);
+        }
+    });
 
-    window.addEventListener('popstate', (e) => {{
-        if (document.getElementById('pdfViewerModal').classList.contains('active')) {{
-            closePdfViewer();
-        }}
-    }});
-
-    function openEditModal(id, title, course, sem, year, category) {{
+    function openEditModal(id, title, course, sem, year) {
         document.getElementById('edit_item_id').value = id;
         document.getElementById('edit_title').value = title;
         document.getElementById('edit_course').value = course;
         document.getElementById('edit_sem').value = sem;
         document.getElementById('edit_year').value = year;
-        document.getElementById('edit_category').value = category || 'pyq';
         openModal('editModal');
-    }}
+    }
 
-    function filterCards() {{
-        const searchVal = document.getElementById('searchInput').value.toLowerCase();
-        const semVal = document.getElementById('semFilter').value;
-        const cards = document.querySelectorAll('.card');
+    function filterCardsLive(query) {
+        const term = query.toLowerCase().trim();
+        const cards = document.querySelectorAll('.card-item');
+        cards.forEach(card => {
+            const text = card.getAttribute('data-search-text') || '';
+            if (text.includes(term)) {
+                card.style.display = 'flex';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
 
-        cards.forEach(card => {{
-            const title = card.getAttribute('data-title').toLowerCase();
-            const course = card.getAttribute('data-course').toLowerCase();
-            const sem = card.getAttribute('data-sem');
-
-            const matchesSearch = title.includes(searchVal) || course.includes(searchVal);
-            const matchesSem = (semVal === 'All Semesters' || sem === semVal);
-
-            card.style.display = (matchesSearch && matchesSem) ? 'flex' : 'none';
-        }});
-    }}
-
-    if ('serviceWorker' in navigator) {{
-        window.addEventListener('load', () => {{
-            navigator.serviceWorker.register('/sw.js');
-        }});
-    }}
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        });
+    }
 </script>
-
 </body>
 </html>
 """
 
-def is_admin(request: Request) -> bool:
-    return request.cookies.get("vault_admin") == "1"
-
-def render_page(request: Request, main_content: str) -> HTMLResponse:
-    admin_active = is_admin(request)
+def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallback_year: str):
+    lower = filename.lower()
     
-    admin_header_btn = '<a class="admin-lock-btn" onclick="openModal(\'loginModal\')">🔒 Admin Access</a>'
-    if admin_active:
-        admin_header_btn = '<a class="admin-lock-btn" href="/logout">🔓 Exit Admin Mode</a>'
+    detected_year = fallback_year.strip() if fallback_year.strip() else None
+    if not detected_year:
+        year_match = re.search(r'\b(20[1-2][0-9])\b', lower)
+        detected_year = year_match.group(1) if year_match else "2024"
 
-    admin_banner_html = ""
-    if admin_active:
-        admin_banner_html = """
-        <div class="admin-banner">
-            <span>⚡ Host Admin Session Active — You have full management privileges.</span>
-            <a href="/logout">Logout Admin</a>
-        </div>
-        """
+    detected_sem = fallback_sem
+    if fallback_sem == "auto":
+        sem_match = re.search(r'(?:sem(?:ester)?[\s_-]*([1-6])|\bs([1-6])\b)', lower)
+        if sem_match:
+            digit = sem_match.group(1) or sem_match.group(2)
+            detected_sem = f"Sem {digit}"
+        else:
+            detected_sem = "Sem 1"
 
-    fab_controls = ""
-    if admin_active:
-        fab_controls = """
-        <div class="fab-bar">
-            <button class="fab" onclick="openModal('uploadModal')">📤 Batch Upload PDFs</button>
-            <button class="fab" onclick="openModal('linkModal')" style="background: var(--caramel);">🔗 Add Link</button>
-        </div>
-        """
+    detected_course = fallback_course
+    if fallback_course == "auto":
+        botany_keywords = [
+            "botany", "plant", "archegoniate", "bryophyte", "pteridophyte", 
+            "gymnosperm", "angiosperm", "algae", "microbiology", "mycology", 
+            "phytopathology", "plant physiology", "plant metabolism", "plant ecology"
+        ]
+        zoology_keywords = [
+            "zoology", "animal", "chordata", "non-chordata", "physiology", 
+            "developmental biology", "genetics", "evolution"
+        ]
+        
+        if any(k in lower for k in botany_keywords):
+            detected_course = "B.Sc (Hons) Botany"
+        elif any(k in lower for k in zoology_keywords):
+            detected_course = "B.Sc (Hons) Zoology"
+        elif "life science" in lower or "life-science" in lower:
+            detected_course = "B.Sc (prog) Life Sciences"
+        elif any(k in lower for k in ["cs", "computer", "c++", "python", "algorithm", "data structure", "dbms", "os"]):
+            detected_course = "B.Sc (Hons) Computer Science"
+        elif any(k in lower for k in ["math", "calculus", "algebra", "differential", "real analysis"]):
+            detected_course = "B.Sc (Hons) Mathematics"
+        elif any(k in lower for k in ["physic", "mechanics", "optics", "electromagnet", "quantum"]):
+            detected_course = "B.Sc (Hons) Physics"
+        elif any(k in lower for k in ["physical science", "physical science with chemistry"]):
+            detected_course = "B.Sc (prog) Physical science with Chemistry"
+        elif any(k in lower for k in ["chemistry", "organic", "inorganic", "physical chem"]):
+            detected_course = "B.Sc (Hons) Chemistry"
+        elif "bcom hons" in lower or "b.com (h)" in lower:
+            detected_course = "B.Com (Hons)"
+        elif "bcom" in lower or "b.com" in lower:
+            detected_course = "B.Com (Programme)"
+        elif "econ" in lower or "macro" in lower or "micro" in lower:
+            detected_course = "B.A. (Hons) Economics"
+        elif "english" in lower or "literature" in lower:
+            detected_course = "B.A. (Hons) English"
+        elif any(k in lower for k in ["pol", "constitution", "governance", "political science"]):
+            detected_course = "B.A. (Hons) Political Science"
+        elif "ba prog" in lower or "b.a prog" in lower:
+            detected_course = "B.A. Programme"
+        elif "cic" in lower or "b.tech" in lower:
+            detected_course = "B.Tech / CIC"
+        else:
+            detected_course = "General / Other"
 
-    course_opts = "".join([f'<option value="{c}">{c}</option>' for c in COURSES if c != "All Courses"])
-    sem_opts = "".join([f'<option value="{s}">{s}</option>' for s in SEMESTERS if s != "All Semesters"])
-
-    html = HTML_TEMPLATE.format(
-        admin_header_btn=admin_header_btn,
-        admin_banner_html=admin_banner_html,
-        main_view_content=main_content,
-        fab_controls=fab_controls,
-        upload_course_options=course_opts,
-        upload_sem_options=sem_opts
-    )
-    return HTMLResponse(content=html)
-
-def auto_detect_metadata(filename: str):
-    fname = filename.upper()
-    
-    sem = "Sem 1"
-    sem_match = re.search(r'SEM(?:ESTER)?[\s\-_]*([1-6])', fname)
-    if sem_match:
-        sem = f"Sem {sem_match.group(1)}"
-    
-    year = "2024"
-    year_match = re.search(r'(20\d{2})', fname)
-    if year_match:
-        year = year_match.group(1)
-
-    course = "General / Other"
-    if "BOTANY" in fname:
-        course = "B.Sc (Hons) Botany"
-    elif "ZOOLOGY" in fname:
-        course = "B.Sc (Hons) Zoology"
-    elif "LIFE SCIENCE" in fname or "LIFE_SCIENCE" in fname:
-        course = "B.Sc (prog) Life Sciences"
-    elif "CHEMISTRY" in fname or "CHEM" in fname:
-        course = "B.Sc (Hons) Chemistry"
-    elif "MATH" in fname:
-        course = "B.Sc (Hons) Mathematics"
-    elif "PHYSICS" in fname or "PHYS" in fname:
-        course = "B.Sc (Hons) Physics"
-    elif "COMPUTER" in fname or "CS" in fname:
-        course = "B.Sc (Hons) Computer Science"
-    elif "BCOM" in fname or "B.COM" in fname:
-        course = "B.Com (Hons)"
-    elif "ECONOMICS" in fname or "ECO" in fname:
-        course = "B.A. (Hons) Economics"
-    elif "POL" in fname or "POLITICAL" in fname:
-        course = "B.A. (Hons) Political Science"
-    elif "ENGLISH" in fname:
-        course = "B.A. (Hons) English"
-
-    title = re.sub(r'\.pdf$', '', filename, flags=re.IGNORECASE)
-    title = re.sub(r'[\-_]', ' ', title).strip()
-
-    return title, course, sem, year
+    base = os.path.splitext(filename)[0]
+    clean_title = re.sub(r'_+', ' ', base).strip().title()
+    return clean_title, detected_course, detected_sem, detected_year
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    counts = {}
-    for cat in CATEGORY_MAP.keys():
-        cursor.execute("SELECT COUNT(*) FROM du_resources WHERE category = ?", (cat,))
-        counts[cat] = cursor.fetchone()[0]
-    conn.close()
-
-    cards_html = ""
-    for cat_key, meta in CATEGORY_MAP.items():
-        cards_html += f"""
-        <a href="/category/{cat_key}" class="category-card">
-            <div class="category-icon">{meta['icon']}</div>
-            <div class="category-title">{meta['name']}</div>
-            <div class="folder-card-count" style="margin-top:6px;">{counts.get(cat_key, 0)} Items Available</div>
-        </a>
-        """
-
-    content = f"""
-    <div style="text-align: center; margin-bottom: 24px;">
-        <h1 style="font-family: 'Georgia', serif; font-size: 1.8rem; margin-bottom: 6px;">Delhi University Vault</h1>
-        <p style="color: var(--text-muted); font-size: 0.95rem;">Select a category to browse past papers, study material, and course resources.</p>
-    </div>
-    <div class="category-grid">
-        {cards_html}
-    </div>
-    """
-    return render_page(request, content)
-
-@app.get("/category/{cat}", response_class=HTMLResponse)
-def view_category(cat: str, request: Request):
-    if cat not in CATEGORY_MAP:
-        return RedirectResponse(url="/", status_code=303)
-
-    cat_meta = CATEGORY_MAP[cat]
+def index(request: Request, q: str = "", course: str = "", sem: str = "All Semesters"):
+    is_admin = request.cookies.get("du_admin_session") == "authenticated"
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT course, COUNT(*) FROM du_resources WHERE category = ? GROUP BY course", (cat,))
-    course_counts = dict(cursor.fetchall())
-    conn.close()
+    cursor.execute("SELECT course, COUNT(*) FROM du_resources GROUP BY course")
+    counts = dict(cursor.fetchall())
 
-    folders_html = ""
-    for tile in COURSE_TILES:
-        c_name = tile["name"]
-        count = course_counts.get(c_name, 0)
-        encoded_course = urllib.parse.quote(c_name)
-        folders_html += f"""
-        <a href="/folder/{cat}/{encoded_course}" class="folder-card">
-            <div class="folder-card-icon">{tile['icon']}</div>
-            <div class="folder-card-title">{tile['label']}</div>
-            <div class="folder-card-count">{count} items</div>
-        </a>
-        """
+    main_view_content = ""
 
-    content = f"""
-    <div class="folder-header-bar">
-        <div class="folder-header-title">
-            <span>{cat_meta['icon']}</span>
-            <span>{cat_meta['name']}</span>
-        </div>
-        <a href="/" class="back-folder-btn">← Back Home</a>
-    </div>
-    <div class="folder-grid">
-        {folders_html}
-    </div>
-    """
-    return render_page(request, content)
-
-@app.get("/folder/{cat}/{course_path}", response_class=HTMLResponse)
-def view_folder(cat: str, course_path: str, request: Request):
-    course = urllib.parse.unquote(course_path)
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT id, title, course, semester, year, type, category, url_or_name, file_size
-        FROM du_resources 
-        WHERE category = ? AND course = ?
-        ORDER BY year DESC, title ASC
-    """, (cat, course))
-    
-    items = cursor.fetchall()
-    conn.close()
-
-    admin_active = is_admin(request)
-    cards_html = ""
-
-    for item in items:
-        item_id, title, c_course, sem, year, r_type, c_cat, url_or_name, file_size = item
-        clean_title = title.replace("'", "\\'")
-        clean_course = c_course.replace("'", "\\'")
-        
-        if r_type == "link":
-            action_btn = f'<a href="{url_or_name}" target="_blank" class="btn-pill btn-caramel">🔗 Open External Link</a>'
-        else:
-            action_btn = f'<button onclick="openPdfViewer(\'/view/{item_id}\', \'{clean_title}\')" class="btn-pill">📄 View Document</button>'
-
-        admin_tools = ""
-        if admin_active:
-            admin_tools = f"""
-            <div class="admin-actions">
-                <button class="edit-btn" onclick="openEditModal({item_id}, '{clean_title}', '{clean_course}', '{sem}', '{year}', '{c_cat}')">✏️ Edit</button>
-                <form action="/delete/{item_id}" method="POST" style="display:inline;" onsubmit="return confirm('Delete this resource?')">
-                    <button type="submit" class="del-btn" title="Delete Resource">🗑️</button>
-                </form>
-            </div>
+    if not course and not q.strip():
+        folders_grid = '<div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">Select Course Folder</div>'
+        folders_grid += '<div class="folder-grid">'
+        for tile in COURSE_TILES:
+            encoded_c = urllib.parse.quote_plus(tile["name"])
+            num_papers = counts.get(tile["name"], 0)
+            folders_grid += f"""
+            <a href="/?course={encoded_c}" class="folder-card">
+                <div class="folder-card-icon">{tile["icon"]}</div>
+                <div class="folder-card-title">{tile["label"]}</div>
+                <div class="folder-card-count">{num_papers} papers</div>
+            </a>
             """
+        folders_grid += '</div>'
 
-        cards_html += f"""
-        <div class="card" data-title="{title}" data-course="{c_course}" data-sem="{sem}">
-            <div>
-                <div class="card-top">
-                    <span class="badge">{sem} • {year or 'N/A'}</span>
-                    {admin_tools}
+        search_bar = """
+        <form method="GET" action="/">
+            <div class="search-box" style="margin-top: 10px;">
+                <input type="text" name="q" placeholder="🔍 Search any paper across all courses...">
+            </div>
+        </form>
+        """
+        main_view_content = search_bar + folders_grid
+    else:
+        query = "SELECT id, title, course, semester, year, type, url_or_name, file_size FROM du_resources WHERE 1=1"
+        params = []
+
+        if course:
+            query += " AND course = ?"
+            params.append(course)
+        if sem != "All Semesters":
+            query += " AND semester = ?"
+            params.append(sem)
+        if q.strip():
+            query += " AND (LOWER(title) LIKE ? OR LOWER(course) LIKE ? OR LOWER(year) LIKE ?)"
+            wc = f"%{q.strip().lower()}%"
+            params.extend([wc, wc, wc])
+
+        query += " ORDER BY id DESC"
+        cursor.execute(query, tuple(params))
+        records = cursor.fetchall()
+
+        matched_tile = next((t for t in COURSE_TILES if t["name"] == course), None)
+        folder_icon = matched_tile["icon"] if matched_tile else "📁"
+        folder_display_name = matched_tile["label"] if matched_tile else (course or f"Search: '{q}'")
+
+        header_bar = f"""
+        <div class="folder-header-bar">
+            <div class="folder-header-title">
+                <span>{folder_icon}</span>
+                <span>{folder_display_name}</span>
+            </div>
+            <a href="/" class="back-folder-btn">← All Folders</a>
+        </div>
+        """
+
+        search_filter_form = f"""
+        <form method="GET" action="/">
+            <input type="hidden" name="course" value="{course}">
+            <div class="search-box">
+                <input type="text" name="q" value="{q}" placeholder="⚡ Live search in this folder..." onkeyup="filterCardsLive(this.value)">
+            </div>
+            <div class="filters">
+                <select name="sem" onchange="this.form.submit()">{ "".join(f'<option value="{s}" {"selected" if s == sem else ""}>{s}</option>' for s in SEMESTERS) }</select>
+            </div>
+        </form>
+        """
+
+        cards_html = ""
+        if not records:
+            cards_html = f'<div class="card" style="text-align:center; padding:40px;"><p style="color:var(--text-muted);">No papers found inside this folder.</p></div>'
+        else:
+            cards_html = '<div class="cards-layout-grid">'
+            for item_id, title, c, s, y, r_type, url_or_name, size in records:
+                safe_title_view = title.replace("'", "\\'")
+                if r_type == "pdf":
+                    action_btn = f"""
+                    <div style="margin-top: 10px;">
+                        <button class="btn-pill" onclick="openPdfViewer('/view/{item_id}', '{safe_title_view}')">View</button>
+                    </div>
+                    """
+                else:
+                    action_btn = f'<div style="margin-top: 10px;"><a class="btn-pill btn-caramel" href="{url_or_name}" target="_blank">Open Link</a></div>'
+
+                admin_opts = ""
+                if is_admin:
+                    safe_title = title.replace("'", "\\'")
+                    safe_c = c.replace("'", "\\'")
+                    admin_opts = f"""
+                    <div class="admin-actions">
+                        <button class="edit-btn" onclick="openEditModal({item_id}, '{safe_title}', '{safe_c}', '{s}', '{y}')">✎ Edit</button>
+                        <form action="/delete/{item_id}" method="POST" onsubmit="return confirm('Delete paper?');">
+                            <button type="submit" class="del-btn">✕</button>
+                        </form>
+                    </div>
+                    """
+
+                card_search_data = f"{title.lower()} {c.lower()} {s.lower()} {y.lower()}"
+
+                cards_html += f"""
+                <div class="card card-item" data-search-text="{card_search_data}">
+                    <div>
+                        <div class="card-top">
+                            <span class="badge">{c}</span>
+                            {admin_opts}
+                        </div>
+                        <div class="card-title">{title}</div>
+                        <div class="card-meta">🎓 {s} &nbsp;•&nbsp; 📅 {y} &nbsp;•&nbsp; 💾 {size}</div>
+                    </div>
+                    {action_btn}
                 </div>
-                <div class="card-title">{title}</div>
-                <div class="card-meta">{c_course} {f"• {file_size}" if file_size else ""}</div>
-            </div>
-            <div style="margin-top: 12px;">
-                {action_btn}
-            </div>
+                """
+            cards_html += '</div>'
+
+        main_view_content = header_bar + search_filter_form + f'<div id="cards-container">{cards_html}</div>'
+
+    conn.close()
+
+    up_course_opts = "".join(f'<option value="{c}">{c}</option>' for c in COURSES[1:])
+    up_sem_opts = "".join(f'<option value="{s}">{s}</option>' for s in SEMESTERS[1:])
+
+    if is_admin:
+        admin_header_btn = '<a href="/logout" class="admin-lock-btn">Logout</a>'
+        admin_banner_html = '<div class="admin-banner"><span>🔓 Host Controls Unlocked</span><a href="/logout">Lock</a></div>'
+        fab_controls = """
+        <div class="fab-bar">
+            <button class="fab" onclick="openModal('uploadModal')">📁 Batch Upload</button>
+            <button class="fab" style="background: var(--caramel);" onclick="openModal('linkModal')">🔗 Add Link</button>
         </div>
         """
+    else:
+        admin_header_btn = '<button onclick="openModal(\'loginModal\')" class="admin-lock-btn">🔒 Admin</button>'
+        admin_banner_html = ""
+        fab_controls = ""
 
-    if not items:
-        cards_html = """
-        <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: var(--text-muted);">
-            <p>No resources found in this folder yet.</p>
-        </div>
-        """
+    content = HTML_TEMPLATE
+    content = content.replace("{main_view_content}", main_view_content)
+    content = content.replace("{upload_course_options}", up_course_opts)
+    content = content.replace("{upload_sem_options}", up_sem_opts)
+    content = content.replace("{admin_header_btn}", admin_header_btn)
+    content = content.replace("{admin_banner_html}", admin_banner_html)
+    content = content.replace("{fab_controls}", fab_controls)
 
-    sem_options = "".join([f'<option value="{s}">{s}</option>' for s in SEMESTERS])
+    return HTMLResponse(content=content)
 
-    content = f"""
-    <div class="folder-header-bar">
-        <div class="folder-header-title">
-            <span>📚</span>
-            <span>{course}</span>
-        </div>
-        <a href="/category/{cat}" class="back-folder-btn">← Back to Category</a>
-    </div>
+@app.post("/login")
+def login(password: str = Form(...)):
+    if password == ADMIN_PASSWORD:
+        response = RedirectResponse(url="/", status_code=303)
+        response.set_cookie(key="du_admin_session", value="authenticated", httponly=True)
+        return response
+    return HTMLResponse("Invalid Password", status_code=401)
 
-    <div class="search-box">
-        <input type="text" id="searchInput" placeholder="🔍 Search papers or topics..." onkeyup="filterCards()">
-    </div>
-
-    <div class="filters">
-        <select id="semFilter" onchange="filterCards()">
-            {sem_options}
-        </select>
-    </div>
-
-    <div class="cards-layout-grid">
-        {cards_html}
-    </div>
-    """
-    return render_page(request, content)
+@app.get("/logout")
+def logout():
+    response = RedirectResponse(url="/", status_code=303)
+    response.delete_cookie(key="du_admin_session")
+    return response
 
 @app.post("/upload")
-async def handle_upload(
+async def upload_files(
     request: Request,
-    category: str = Form("pyq"),
     course: str = Form("auto"),
     sem: str = Form("auto"),
     year: str = Form(""),
     files: list[UploadFile] = File(...)
 ):
-    if not is_admin(request):
-        return RedirectResponse(url="/", status_code=303)
+    if request.cookies.get("du_admin_session") != "authenticated":
+        return HTMLResponse("Unauthorized. Please log in as Admin.", status_code=403)
 
     conn = get_db()
     cursor = conn.cursor()
-
+    last_detected_course = None
     for file in files:
-        if not file.filename:
-            continue
-        
-        contents = await file.read()
-        size_kb = round(len(contents) / 1024, 1)
-        file_size_str = f"{size_kb} KB" if size_kb < 1024 else f"{round(size_kb/1024, 2)} MB"
-
-        auto_title, auto_course, auto_sem, auto_year = auto_detect_metadata(file.filename)
-
-        final_course = auto_course if course == "auto" else course
-        final_sem = auto_sem if sem == "auto" else sem
-        final_year = year.strip() if year.strip() else auto_year
-
-        cursor.execute("""
-            INSERT INTO du_resources (title, course, semester, year, type, category, url_or_name, file_data, file_size)
-            VALUES (?, ?, ?, ?, 'pdf', ?, ?, ?, ?)
-        """, (auto_title, final_course, final_sem, final_year, category, file.filename, contents, file_size_str))
-
+        if file.filename.lower().endswith(".pdf"):
+            data = await file.read()
+            size_mb = f"{len(data) / (1024 * 1024):.2f} MB"
+            clean_title, detected_course, detected_sem, detected_year = parse_filename(
+                file.filename, course, sem, year
+            )
+            last_detected_course = detected_course
+            cursor.execute("""
+                INSERT INTO du_resources (title, course, semester, year, type, url_or_name, file_data, file_size)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (clean_title, detected_course, detected_sem, detected_year, "pdf", file.filename, data, size_mb))
     conn.commit()
     conn.close()
-    return RedirectResponse(url=f"/category/{category}", status_code=303)
 
-@app.post("/add-link")
-def add_link(
-    request: Request,
-    category: str = Form("timetable"),
-    title: str = Form(...),
-    url: str = Form(...),
-    course: str = Form(...),
-    sem: str = Form(...)
-):
-    if not is_admin(request):
-        return RedirectResponse(url="/", status_code=303)
-
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO du_resources (title, course, semester, year, type, category, url_or_name)
-        VALUES (?, ?, ?, '2024', 'link', ?, ?)
-    """, (title, course, sem, category, url))
-    
-    conn.commit()
-    conn.close()
-    return RedirectResponse(url=f"/category/{category}", status_code=303)
+    redirect_url = f"/?course={urllib.parse.quote_plus(last_detected_course)}" if last_detected_course else "/"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 @app.post("/edit-item")
 def edit_item(
@@ -1256,67 +1168,75 @@ def edit_item(
     title: str = Form(...),
     course: str = Form(...),
     sem: str = Form(...),
-    year: str = Form(...),
-    category: str = Form("pyq")
+    year: str = Form(...)
 ):
-    if not is_admin(request):
-        return RedirectResponse(url="/", status_code=303)
+    if request.cookies.get("du_admin_session") != "authenticated":
+        return HTMLResponse("Unauthorized.", status_code=403)
 
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE du_resources
-        SET title = ?, course = ?, semester = ?, year = ?, category = ?
+        SET title = ?, course = ?, semester = ?, year = ?
         WHERE id = ?
-    """, (title, course, sem, year, category, item_id))
-    
+    """, (title, course, sem, year, item_id))
     conn.commit()
     conn.close()
-    return RedirectResponse(url=f"/category/{category}", status_code=303)
 
-@app.post("/delete/{item_id}")
-def delete_item(item_id: int, request: Request):
-    if not is_admin(request):
-        return RedirectResponse(url="/", status_code=303)
+    return RedirectResponse(url=f"/?course={urllib.parse.quote_plus(course)}", status_code=303)
+
+@app.post("/add-link")
+def add_link(
+    request: Request,
+    title: str = Form(...),
+    url: str = Form(...),
+    course: str = Form(...),
+    sem: str = Form(...)
+):
+    if request.cookies.get("du_admin_session") != "authenticated":
+        return HTMLResponse("Unauthorized.", status_code=403)
 
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT category FROM du_resources WHERE id = ?", (item_id,))
-    res = cursor.fetchone()
-    cat = res[0] if res else "pyq"
-
-    cursor.execute("DELETE FROM du_resources WHERE id = ?", (item_id,))
+    cursor.execute("""
+        INSERT INTO du_resources (title, course, semester, year, type, url_or_name, file_data, file_size)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (title, course, sem, "Web", "link", url, None, "Link"))
     conn.commit()
     conn.close()
-    return RedirectResponse(url=f"/category/{cat}", status_code=303)
+    return RedirectResponse(url=f"/?course={urllib.parse.quote_plus(course)}", status_code=303)
 
 @app.get("/view/{item_id}")
 def view_pdf(item_id: int):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT file_data, url_or_name FROM du_resources WHERE id = ?", (item_id,))
-    res = cursor.fetchone()
+    cursor.execute("SELECT title, file_data FROM du_resources WHERE id = ?", (item_id,))
+    row = cursor.fetchone()
     conn.close()
+    if row and row[1]:
+        return StreamingResponse(
+            io.BytesIO(row[1]),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="{row[0]}.pdf"',
+                "X-Content-Type-Options": "nosniff",
+                "Cache-Control": "public, max-age=604800, immutable"
+            }
+        )
+    return HTMLResponse("Not Found", status_code=404)
 
-    if not res or not res[0]:
-        return Response(content="File Not Found", status_code=404)
+@app.post("/delete/{item_id}")
+def delete_item(request: Request, item_id: int):
+    if request.cookies.get("du_admin_session") != "authenticated":
+        return HTMLResponse("Unauthorized.", status_code=403)
 
-    file_bytes, filename = res
-    headers = {
-        "Content-Disposition": f"inline; filename=\"{filename or 'document.pdf'}\"",
-        "Cache-Control": "public, max-age=31536000, immutable"
-    }
-    return StreamingResponse(io.BytesIO(file_bytes), media_type="application/pdf", headers=headers)
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM du_resources WHERE id = ?", (item_id,))
+    conn.commit()
+    conn.close()
+    return RedirectResponse(url="/", status_code=303)
 
-@app.post("/login")
-def login(password: str = Form(...)):
-    response = RedirectResponse(url="/", status_code=303)
-    if password == ADMIN_PASSWORD:
-        response.set_cookie(key="vault_admin", value="1", max_age=86400 * 30, httponly=True)
-    return response
-
-@app.get("/logout")
-def logout():
-    response = RedirectResponse(url="/", status_code=303)
-    response.delete_cookie(key="vault_admin")
-    return response
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
