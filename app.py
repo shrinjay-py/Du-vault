@@ -204,7 +204,7 @@ HTML_TEMPLATE = """
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
     <style>
-        :root {
+        :root {{
             --espresso: #1E1A17;
             --caramel: #A77A53;
             --bg-latte: #E8DDD1;
@@ -212,14 +212,14 @@ HTML_TEMPLATE = """
             --border-latte: #D8C7B6;
             --text-dark: #261E19;
             --text-muted: #7E6A5B;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
+        }}
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{
             font-family: 'Inter', sans-serif;
             background-color: var(--bg-latte);
             color: var(--text-dark);
             padding-bottom: 90px;
-        }
+        }}
 
         [data-render-badge],
         div[class*="render-badge"],
@@ -228,7 +228,7 @@ HTML_TEMPLATE = """
         a[href*="render.com"][style*="fixed"],
         a[href*="render.com"][style*="absolute"],
         a[href*="render.com"][class*="badge"],
-        div[style*="z-index"][style*="fixed"] a[href*="render.com"] {
+        div[style*="z-index"][style*="fixed"] a[href*="render.com"] {{
             display: none !important;
             visibility: hidden !important;
             pointer-events: none !important;
@@ -238,9 +238,9 @@ HTML_TEMPLATE = """
             position: absolute !important;
             left: -9999px !important;
             top: -9999px !important;
-        }
+        }}
 
-        #loading-screen {
+        #loading-screen {{
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
             background: radial-gradient(circle at center, #2B231D 0%, #151210 100%);
@@ -250,13 +250,13 @@ HTML_TEMPLATE = """
             align-items: center;
             justify-content: center;
             transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
-        #loading-screen.fade-out {
+        }}
+        #loading-screen.fade-out {{
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
-        }
-        .loader-box {
+        }}
+        .loader-box {{
             position: relative;
             width: 90px;
             height: 90px;
@@ -264,8 +264,8 @@ HTML_TEMPLATE = """
             align-items: center;
             justify-content: center;
             margin-bottom: 16px;
-        }
-        .loader-ring {
+        }}
+        .loader-ring {{
             position: absolute;
             width: 100%;
             height: 100%;
@@ -273,8 +273,8 @@ HTML_TEMPLATE = """
             border: 3px solid rgba(167, 122, 83, 0.2);
             border-top: 3px solid var(--caramel);
             animation: spinRing 1s cubic-bezier(0.55, 0.055, 0.675, 0.19) infinite;
-        }
-        .loader-logo {
+        }}
+        .loader-logo {{
             width: 56px;
             height: 56px;
             background: var(--caramel);
@@ -288,25 +288,25 @@ HTML_TEMPLATE = """
             font-size: 1.3rem;
             box-shadow: 0 4px 18px rgba(167, 122, 83, 0.35);
             animation: pulseLogo 1.6s ease-in-out infinite alternate;
-        }
-        .loader-text {
+        }}
+        .loader-text {{
             color: #FAF6F2;
             font-family: 'Georgia', serif;
             font-size: 1rem;
             letter-spacing: 1px;
-        }
-        .loader-subtext {
+        }}
+        .loader-subtext {{
             color: #A77A53;
             font-size: 0.72rem;
             letter-spacing: 1.5px;
             text-transform: uppercase;
             font-weight: 600;
             margin-top: 6px;
-        }
-        @keyframes spinRing { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes pulseLogo { 0% { transform: scale(0.94); } 100% { transform: scale(1.05); } }
+        }}
+        @keyframes spinRing {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+        @keyframes pulseLogo {{ 0% {{ transform: scale(0.94); }} 100% {{ transform: scale(1.05); }} }}
 
-        header {
+        header {{
             background: var(--espresso);
             color: #FAF6F2;
             padding: 14px 24px;
@@ -314,41 +314,41 @@ HTML_TEMPLATE = """
             display: flex;
             align-items: center;
             justify-content: space-between;
-        }
-        .brand-title { 
+        }}
+        .brand-title {{ 
             font-family: 'Georgia', serif; 
             font-size: 1.25rem; 
             font-weight: bold; 
             letter-spacing: 0.5px;
             text-decoration: none;
             color: #FAF6F2;
-        }
-        .brand-right {
+        }}
+        .brand-right {{
             display: flex;
             align-items: center;
             gap: 16px;
-        }
-        .founder-tag {
+        }}
+        .founder-tag {{
             font-family: 'Georgia', serif;
             font-size: 0.9rem;
             color: #FAF6F2;
             text-align: right;
             line-height: 1.2;
-        }
-        .founder-tag span.founder-name {
+        }}
+        .founder-tag span.founder-name {{
             color: var(--caramel);
             font-weight: 700;
             font-size: 0.95rem;
-        }
-        .college-subtag {
+        }}
+        .college-subtag {{
             font-size: 0.52rem;
             color: #BFA898;
             font-family: 'Inter', sans-serif;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             display: block;
-        }
-        .admin-lock-btn {
+        }}
+        .admin-lock-btn {{
             background: transparent;
             border: 1px solid rgba(255,255,255,0.25);
             color: #FAF6F2;
@@ -357,8 +357,8 @@ HTML_TEMPLATE = """
             font-size: 0.75rem;
             cursor: pointer;
             text-decoration: none;
-        }
-        .admin-banner {
+        }}
+        .admin-banner {{
             background: #D4A373;
             color: #1E1A17;
             padding: 8px 24px;
@@ -367,23 +367,23 @@ HTML_TEMPLATE = """
             display: flex;
             justify-content: space-between;
             align-items: center;
-        }
-        .admin-banner a { color: #641E16; text-decoration: underline; cursor: pointer; }
+        }}
+        .admin-banner a {{ color: #641E16; text-decoration: underline; cursor: pointer; }}
         
-        .container { 
+        .container {{ 
             width: 100%;
             max-width: 1100px; 
             margin: 0 auto; 
             padding: 20px 16px; 
-        }
+        }}
 
-        .category-grid {
+        .category-grid {{
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 16px;
             margin: 20px 0;
-        }
-        .category-card {
+        }}
+        .category-card {{
             text-decoration: none;
             color: var(--text-dark);
             background: var(--card-foam);
@@ -396,22 +396,22 @@ HTML_TEMPLATE = """
             justify-content: center;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-        }
-        .category-card:hover {
+        }}
+        .category-card:hover {{
             transform: translateY(-3px);
             box-shadow: 0 8px 20px rgba(0,0,0,0.1);
             border-color: var(--caramel);
-        }
-        .category-icon { font-size: 3rem; margin-bottom: 10px; }
-        .category-title { font-family: 'Georgia', serif; font-size: 1.25rem; font-weight: 700; text-align: center; }
+        }}
+        .category-icon {{ font-size: 3rem; margin-bottom: 10px; }}
+        .category-title {{ font-family: 'Georgia', serif; font-size: 1.25rem; font-weight: 700; text-align: center; }}
 
-        .folder-grid {
+        .folder-grid {{
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 14px;
             margin: 14px 0 24px 0;
-        }
-        .folder-card {
+        }}
+        .folder-card {{
             text-decoration: none;
             color: var(--text-dark);
             background: var(--card-foam);
@@ -423,17 +423,17 @@ HTML_TEMPLATE = """
             align-items: center;
             box-shadow: 0 2px 6px rgba(0,0,0,0.04);
             transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-        .folder-card:hover {
+        }}
+        .folder-card:hover {{
             transform: translateY(-2px);
             box-shadow: 0 6px 14px rgba(0,0,0,0.08);
             border-color: var(--caramel);
-        }
-        .folder-card-icon { font-size: 2.4rem; margin-bottom: 8px; }
-        .folder-card-title { font-size: 0.88rem; font-weight: 700; text-align: center; }
-        .folder-card-count { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+        }}
+        .folder-card-icon {{ font-size: 2.4rem; margin-bottom: 8px; }}
+        .folder-card-title {{ font-size: 0.88rem; font-weight: 700; text-align: center; }}
+        .folder-card-count {{ font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }}
 
-        .folder-header-bar {
+        .folder-header-bar {{
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -442,16 +442,16 @@ HTML_TEMPLATE = """
             border-radius: 16px;
             padding: 16px 20px;
             margin-bottom: 16px;
-        }
-        .folder-header-title {
+        }}
+        .folder-header-title {{
             display: flex;
             align-items: center;
             gap: 12px;
             font-family: 'Georgia', serif;
             font-size: 1.2rem;
             font-weight: bold;
-        }
-        .back-folder-btn {
+        }}
+        .back-folder-btn {{
             background: var(--espresso);
             color: #FAF6F2;
             text-decoration: none;
@@ -459,80 +459,80 @@ HTML_TEMPLATE = """
             border-radius: 12px;
             font-size: 0.82rem;
             font-weight: 600;
-        }
+        }}
 
-        .search-box input {
+        .search-box input {{
             width: 100%; padding: 12px 20px; border-radius: 25px;
             border: 1px solid var(--border-latte); background: var(--card-foam);
             font-size: 0.95rem; outline: none; margin-bottom: 12px;
-        }
-        .filters { display: flex; gap: 10px; margin-bottom: 16px; }
-        select {
+        }}
+        .filters {{ display: flex; gap: 10px; margin-bottom: 16px; }}
+        select {{
             flex: 1; padding: 11px 14px; border-radius: 18px;
             border: 1px solid var(--border-latte); background: var(--card-foam);
             font-size: 0.88rem; outline: none;
-        }
+        }}
 
-        .cards-layout-grid {
+        .cards-layout-grid {{
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 14px;
-        }
-        .card {
+        }}
+        .card {{
             background: var(--card-foam); border: 1px solid var(--border-latte);
             border-radius: 18px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between;
-        }
-        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .badge { font-size: 0.78rem; font-weight: 700; color: var(--caramel); }
-        .admin-actions { display: flex; gap: 8px; align-items: center; }
-        .edit-btn { background: none; border: none; color: var(--caramel); font-size: 0.85rem; cursor: pointer; font-weight: 600; }
-        .del-btn { background: none; border: none; color: #BA1A1A; font-size: 1.1rem; cursor: pointer; padding: 0 4px; }
+        }}
+        .card-top {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }}
+        .badge {{ font-size: 0.78rem; font-weight: 700; color: var(--caramel); }}
+        .admin-actions {{ display: flex; gap: 8px; align-items: center; }}
+        .edit-btn {{ background: none; border: none; color: var(--caramel); font-size: 0.85rem; cursor: pointer; font-weight: 600; }}
+        .del-btn {{ background: none; border: none; color: #BA1A1A; font-size: 1.1rem; cursor: pointer; padding: 0 4px; }}
         
-        .card-title { font-family: 'Georgia', serif; font-size: 1.05rem; font-weight: bold; margin-bottom: 6px; }
-        .card-meta { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px; }
-        .btn-pill {
+        .card-title {{ font-family: 'Georgia', serif; font-size: 1.05rem; font-weight: bold; margin-bottom: 6px; }}
+        .card-meta {{ font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px; }}
+        .btn-pill {{
             display: inline-block; text-align: center; width: 100%; padding: 10px 0;
             background: var(--espresso); color: #FAF6F2; text-decoration: none;
             font-size: 0.88rem; font-weight: 600; border-radius: 20px; border: none; cursor: pointer;
-        }
-        .btn-caramel { background: var(--caramel); }
-        .fab-bar {
+        }}
+        .btn-caramel {{ background: var(--caramel); }}
+        .fab-bar {{
             position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
             display: flex; gap: 12px; z-index: 100;
-        }
-        .fab {
+        }}
+        .fab {{
             padding: 13px 22px; border-radius: 30px; background: var(--espresso);
             color: #FAF6F2; border: none; font-size: 0.92rem; font-weight: 600;
             box-shadow: 0 4px 16px rgba(0,0,0,0.25); cursor: pointer;
-        }
-        .modal {
+        }}
+        .modal {{
             display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(30,26,23,0.65); z-index: 200; align-items: center; justify-content: center;
-        }
-        .modal.active { display: flex; }
-        .modal-content {
+        }}
+        .modal.active {{ display: flex; }}
+        .modal-content {{
             background: var(--card-foam); width: 92%; max-width: 520px;
             border-radius: 20px; padding: 26px; max-height: 88vh; overflow-y: auto;
-        }
-        .modal-title { font-family: 'Georgia', serif; font-size: 1.25rem; font-weight: bold; margin-bottom: 14px; }
-        .form-group { margin-bottom: 14px; }
-        .form-group label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 5px; }
-        .form-group input, .form-group select {
+        }}
+        .modal-title {{ font-family: 'Georgia', serif; font-size: 1.25rem; font-weight: bold; margin-bottom: 14px; }}
+        .form-group {{ margin-bottom: 14px; }}
+        .form-group label {{ display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 5px; }}
+        .form-group input, .form-group select {{
             width: 100%; padding: 11px; border-radius: 12px;
             border: 1px solid var(--border-latte); background: var(--bg-latte); outline: none;
-        }
-        .helper-text { font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; }
+        }}
+        .helper-text {{ font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; }}
 
-        #pdfViewerModal {
+        #pdfViewerModal {{
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
             background: #14110E;
             z-index: 99999;
             flex-direction: column;
-        }
-        #pdfViewerModal.active { display: flex; }
-        .pdf-viewer-header {
+        }}
+        #pdfViewerModal.active {{ display: flex; }}
+        .pdf-viewer-header {{
             background: var(--espresso);
             color: #FAF6F2;
             padding: 12px 20px;
@@ -541,8 +541,8 @@ HTML_TEMPLATE = """
             justify-content: space-between;
             border-bottom: 1px solid rgba(255,255,255,0.1);
             gap: 12px;
-        }
-        .pdf-viewer-title {
+        }}
+        .pdf-viewer-title {{
             font-family: 'Georgia', serif;
             font-size: 0.95rem;
             font-weight: 600;
@@ -550,20 +550,20 @@ HTML_TEMPLATE = """
             overflow: hidden;
             text-overflow: ellipsis;
             max-width: 55%;
-        }
-        .pdf-toolbar {
+        }}
+        .pdf-toolbar {{
             display: flex;
             align-items: center;
             gap: 10px;
-        }
-        .zoom-controls {
+        }}
+        .zoom-controls {{
             display: flex;
             background: rgba(255,255,255,0.08);
             border-radius: 14px;
             padding: 2px;
             border: 1px solid rgba(255,255,255,0.15);
-        }
-        .zoom-btn {
+        }}
+        .zoom-btn {{
             background: transparent;
             color: #FAF6F2;
             border: none;
@@ -573,10 +573,10 @@ HTML_TEMPLATE = """
             font-weight: 700;
             cursor: pointer;
             transition: background 0.15s ease;
-        }
-        .zoom-btn:hover { background: rgba(255,255,255,0.15); }
-        .zoom-btn:active { background: var(--caramel); }
-        .zoom-level-text {
+        }}
+        .zoom-btn:hover {{ background: rgba(255,255,255,0.15); }}
+        .zoom-btn:active {{ background: var(--caramel); }}
+        .zoom-level-text {{
             color: #D8C7B6;
             font-size: 0.78rem;
             font-weight: 600;
@@ -585,8 +585,8 @@ HTML_TEMPLATE = """
             align-items: center;
             min-width: 48px;
             justify-content: center;
-        }
-        .pdf-close-btn {
+        }}
+        .pdf-close-btn {{
             background: var(--caramel);
             color: #FAF6F2;
             border: none;
@@ -595,8 +595,8 @@ HTML_TEMPLATE = """
             font-size: 0.82rem;
             font-weight: 700;
             cursor: pointer;
-        }
-        #pdf-scroll-container {
+        }}
+        #pdf-scroll-container {{
             flex: 1;
             overflow: auto;
             background: #1E1A17;
@@ -607,27 +607,27 @@ HTML_TEMPLATE = """
             -webkit-overflow-scrolling: touch;
             user-select: none;
             -webkit-user-select: none;
-        }
-        .pdf-canvas-wrap {
+        }}
+        .pdf-canvas-wrap {{
             margin: 0 auto 16px auto;
             box-shadow: 0 4px 20px rgba(0,0,0,0.6);
             border-radius: 4px;
             background: #FFFFFF;
             line-height: 0;
-        }
-        .pdf-page-canvas {
+        }}
+        .pdf-page-canvas {{
             display: block;
             border-radius: 4px;
             pointer-events: none;
-        }
-        .pdf-spinner {
+        }}
+        .pdf-spinner {{
             width: 44px; height: 44px;
             border: 3px solid rgba(167, 122, 83, 0.25);
             border-top: 3px solid var(--caramel);
             border-radius: 50%;
             animation: spinRing 0.9s linear infinite;
             margin-bottom: 14px;
-        }
+        }}
     </style>
 </head>
 <body>
@@ -775,38 +775,38 @@ HTML_TEMPLATE = """
 </div>
 
 <script>
-    if (window.pdfjsLib) {
+    if (window.pdfjsLib) {{
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
+    }}
 
-    function openModal(id) { document.getElementById(id).classList.add('active'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    function openModal(id) {{ document.getElementById(id).classList.add('active'); }}
+    function closeModal(id) {{ document.getElementById(id).classList.remove('active'); }}
 
-    function showLoader() {
+    function showLoader() {{
         const loader = document.getElementById('loading-screen');
         if (loader) loader.classList.remove('fade-out');
-    }
+    }}
 
-    function hideLoader() {
+    function hideLoader() {{
         const loader = document.getElementById('loading-screen');
         if (loader) loader.classList.add('fade-out');
-    }
+    }}
 
-    window.addEventListener('load', () => { setTimeout(hideLoader, 200); });
+    window.addEventListener('load', () => {{ setTimeout(hideLoader, 200); }});
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', () => {{
         const triggers = document.querySelectorAll('a.folder-card, a.category-card, a.back-folder-btn');
-        triggers.forEach(el => {
-            el.addEventListener('click', (e) => {
-                if (!e.ctrlKey && !e.metaKey && !el.target) { showLoader(); }
-            });
-        });
-    });
+        triggers.forEach(el => {{
+            el.addEventListener('click', (e) => {{
+                if (!e.ctrlKey && !e.metaKey && !el.target) {{ showLoader(); }}
+            }});
+        }});
+    }});
 
     let activePdfDoc = null;
     let currentZoomMultiplier = 1.0;
 
-    async function openPdfViewer(url, title) {
+    async function openPdfViewer(url, title) {{
         document.getElementById('pdfModalTitle').innerText = title;
         currentZoomMultiplier = 1.0;
         updateZoomDisplay();
@@ -819,23 +819,23 @@ HTML_TEMPLATE = """
             </div>
         `;
         document.getElementById('pdfViewerModal').classList.add('active');
-        history.pushState({ pdfOpen: true }, '');
+        history.pushState({{ pdfOpen: true }}, '');
 
-        try {
+        try {{
             const loadingTask = pdfjsLib.getDocument(url);
             activePdfDoc = await loadingTask.promise;
             await renderPdfPages();
-        } catch (err) {
+        }} catch (err) {{
             console.error(err);
             container.innerHTML = `
                 <div style="color: #FAF6F2; padding: 40px 20px; text-align: center;">
                     <p>Failed to load document preview.</p>
                 </div>
             `;
-        }
-    }
+        }}
+    }}
 
-    async function renderPdfPages() {
+    async function renderPdfPages() {{
         if (!activePdfDoc) return;
         const container = document.getElementById('pdf-scroll-container');
         container.innerHTML = '';
@@ -843,15 +843,15 @@ HTML_TEMPLATE = """
         const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
         const availableWidth = Math.min(window.innerWidth - 32, 950);
 
-        for (let pageNum = 1; pageNum <= activePdfDoc.numPages; pageNum++) {
+        for (let pageNum = 1; pageNum <= activePdfDoc.numPages; pageNum++) {{
             const page = await activePdfDoc.getPage(pageNum);
             
-            const unscaledViewport = page.getViewport({ scale: 1.0 });
+            const unscaledViewport = page.getViewport({{ scale: 1.0 }});
             const baseScale = availableWidth / unscaledViewport.width;
             const finalScale = baseScale * currentZoomMultiplier;
 
-            const cssViewport = page.getViewport({ scale: finalScale });
-            const highResViewport = page.getViewport({ scale: finalScale * dpr });
+            const cssViewport = page.getViewport({{ scale: finalScale }});
+            const highResViewport = page.getViewport({{ scale: finalScale * dpr }});
 
             const canvasWrap = document.createElement('div');
             canvasWrap.className = 'pdf-canvas-wrap';
@@ -867,45 +867,45 @@ HTML_TEMPLATE = """
             container.appendChild(canvasWrap);
 
             const context = canvas.getContext('2d');
-            await page.render({
+            await page.render({{
                 canvasContext: context,
                 viewport: highResViewport
-            }).promise;
-        }
-    }
+            }}).promise;
+        }}
+    }}
 
-    function adjustZoom(delta) {
+    function adjustZoom(delta) {{
         currentZoomMultiplier = Math.max(0.5, Math.min(3.0, currentZoomMultiplier + delta));
         updateZoomDisplay();
         renderPdfPages();
-    }
+    }}
 
-    function resetZoom() {
+    function resetZoom() {{
         currentZoomMultiplier = 1.0;
         updateZoomDisplay();
         renderPdfPages();
-    }
+    }}
 
-    function updateZoomDisplay() {
+    function updateZoomDisplay() {{
         const el = document.getElementById('zoomLevelDisplay');
         if (el) el.innerText = Math.round(currentZoomMultiplier * 100) + '%';
-    }
+    }}
 
-    function closePdfViewer() {
+    function closePdfViewer() {{
         document.getElementById('pdfViewerModal').classList.remove('active');
         activePdfDoc = null;
-        if (history.state && history.state.pdfOpen) {
+        if (history.state && history.state.pdfOpen) {{
             history.back();
-        }
-    }
+        }}
+    }}
 
-    window.addEventListener('popstate', (e) => {
-        if (document.getElementById('pdfViewerModal').classList.contains('active')) {
+    window.addEventListener('popstate', (e) => {{
+        if (document.getElementById('pdfViewerModal').classList.contains('active')) {{
             closePdfViewer();
-        }
-    });
+        }}
+    }});
 
-    function openEditModal(id, title, course, sem, year, category) {
+    function openEditModal(id, title, course, sem, year, category) {{
         document.getElementById('edit_item_id').value = id;
         document.getElementById('edit_title').value = title;
         document.getElementById('edit_course').value = course;
@@ -913,14 +913,14 @@ HTML_TEMPLATE = """
         document.getElementById('edit_year').value = year;
         document.getElementById('edit_category').value = category || 'pyq';
         openModal('editModal');
-    }
+    }}
 
-    function filterCards() {
+    function filterCards() {{
         const searchVal = document.getElementById('searchInput').value.toLowerCase();
         const semVal = document.getElementById('semFilter').value;
         const cards = document.querySelectorAll('.card');
 
-        cards.forEach(card => {
+        cards.forEach(card => {{
             const title = card.getAttribute('data-title').toLowerCase();
             const course = card.getAttribute('data-course').toLowerCase();
             const sem = card.getAttribute('data-sem');
@@ -929,14 +929,14 @@ HTML_TEMPLATE = """
             const matchesSem = (semVal === 'All Semesters' || sem === semVal);
 
             card.style.display = (matchesSearch && matchesSem) ? 'flex' : 'none';
-        });
-    }
+        }});
+    }}
 
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
+    if ('serviceWorker' in navigator) {{
+        window.addEventListener('load', () => {{
             navigator.serviceWorker.register('/sw.js');
-        });
-    }
+        }});
+    }}
 </script>
 
 </body>
