@@ -1,5 +1,4 @@
-
-   import os
+import os
 import io
 import re
 import urllib.parse
@@ -92,7 +91,6 @@ def init_db():
 
 init_db()
 
-# --- PWA Manifest & Assets ---
 PWA_MANIFEST = """{
   "name": "DU PYQ Vault",
   "short_name": "DU Vault",
@@ -242,7 +240,6 @@ HTML_TEMPLATE = """
             top: -9999px !important;
         }
 
-        /* Loading Screen */
         #loading-screen {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -380,7 +377,6 @@ HTML_TEMPLATE = """
             padding: 20px 16px; 
         }
 
-        /* Top Category Grid */
         .category-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -527,7 +523,6 @@ HTML_TEMPLATE = """
         }
         .helper-text { font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; }
 
-        /* Fullscreen In-App PDF Viewer */
         #pdfViewerModal {
             display: none;
             position: fixed;
@@ -665,7 +660,6 @@ HTML_TEMPLATE = """
 
 {fab_controls}
 
-<!-- Native In-App PDF Viewing Stage -->
 <div id="pdfViewerModal">
     <div class="pdf-viewer-header">
         <div class="pdf-viewer-title" id="pdfModalTitle">Viewing Document</div>
@@ -682,7 +676,6 @@ HTML_TEMPLATE = """
     <div id="pdf-scroll-container" oncontextmenu="return false;"></div>
 </div>
 
-<!-- BATCH UPLOAD MODAL -->
 <div class="modal" id="uploadModal" onclick="if(event.target === this) closeModal('uploadModal')">
     <div class="modal-content">
         <div class="modal-title">Batch Upload PDFs</div>
@@ -723,7 +716,6 @@ HTML_TEMPLATE = """
     </div>
 </div>
 
-<!-- LINK MODAL -->
 <div class="modal" id="linkModal" onclick="if(event.target === this) closeModal('linkModal')">
     <div class="modal-content">
         <div class="modal-title">Add Reference / External Link</div>
@@ -746,7 +738,6 @@ HTML_TEMPLATE = """
     </div>
 </div>
 
-<!-- EDIT ITEM MODAL -->
 <div class="modal" id="editModal" onclick="if(event.target === this) closeModal('editModal')">
     <div class="modal-content">
         <div class="modal-title">Edit Resource Details</div>
@@ -770,7 +761,6 @@ HTML_TEMPLATE = """
     </div>
 </div>
 
-<!-- LOGIN MODAL -->
 <div class="modal" id="loginModal" onclick="if(event.target === this) closeModal('loginModal')">
     <div class="modal-content">
         <div class="modal-title">Host Admin Access</div>
@@ -997,19 +987,16 @@ def render_page(request: Request, main_content: str) -> HTMLResponse:
 def auto_detect_metadata(filename: str):
     fname = filename.upper()
     
-    # Semester detection
     sem = "Sem 1"
     sem_match = re.search(r'SEM(?:ESTER)?[\s\-_]*([1-6])', fname)
     if sem_match:
         sem = f"Sem {sem_match.group(1)}"
     
-    # Year detection
     year = "2024"
     year_match = re.search(r'(20\d{2})', fname)
     if year_match:
         year = year_match.group(1)
 
-    # Course detection
     course = "General / Other"
     if "BOTANY" in fname:
         course = "B.Sc (Hons) Botany"
@@ -1034,7 +1021,6 @@ def auto_detect_metadata(filename: str):
     elif "ENGLISH" in fname:
         course = "B.A. (Hons) English"
 
-    # Clean title
     title = re.sub(r'\.pdf$', '', filename, flags=re.IGNORECASE)
     title = re.sub(r'[\-_]', ' ', title).strip()
 
@@ -1081,7 +1067,6 @@ def view_category(cat: str, request: Request):
     conn = get_db()
     cursor = conn.cursor()
 
-    # Get resource counts grouped by course for this category
     cursor.execute("SELECT course, COUNT(*) FROM du_resources WHERE category = ? GROUP BY course", (cat,))
     course_counts = dict(cursor.fetchall())
     conn.close()
