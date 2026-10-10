@@ -38,7 +38,7 @@ COURSES = [
     "B.A. Programme",
     "B.Tech / CIC",
     "Postgraduate",
-    "General / Other"
+    "General/Other"
 ]
 
 COURSE_TILES = [
@@ -78,7 +78,6 @@ def init_db():
 
 init_db()
 
-# --- PWA Manifest & Assets ---
 PWA_MANIFEST = """{
   "name": "DU PYQ Vault",
   "short_name": "DU Vault",
@@ -112,10 +111,10 @@ PWA_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" 
   <text x="256" y="365" font-family="sans-serif" font-size="34" letter-spacing="4" font-weight="bold" fill="#1E1A17" text-anchor="middle">VAULT</text>
 </svg>"""
 
-SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v15';
+SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v17';
 const PRECACHE = [
   '/', 
-  '/manifest.json', 
+  '/manifest.json',
   '/icon.svg',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
@@ -137,22 +136,26 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-  if (e.request.url.includes('/view/')) {
-    e.respondWith(
-      caches.open(CACHE_NAME).then(async (cache) => {
-        const cachedResponse = await cache.match(e.request);
-        if (cachedResponse) return cachedResponse;
-        const netResponse = await fetch(e.request);
-        cache.put(e.request, netResponse.clone());
-        return netResponse;
-      })
-    );
-    return;
-  }
   e.respondWith(
-    fetch(e.request).catch(async () => {
-      const cached = await caches.match(e.request);
-      return cached || (e.request.mode === 'navigate' ? caches.match('/') : null);
+    caches.match(e.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        fetch(e.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, networkResponse));
+          }
+        }).catch(() => {});
+        return cachedResponse;
+      }
+      return fetch(e.request).then((networkResponse) => {
+        return caches.open(CACHE_NAME).then((cache) => {
+          cache.put(e.request, networkResponse.clone());
+          return networkResponse;
+        });
+      }).catch(() => {
+        if (e.request.mode === 'navigate') {
+          return caches.match('/');
+        }
+      });
     })
   );
 });"""
@@ -188,7 +191,7 @@ HTML_TEMPLATE = """
     <link rel="icon" type="image/svg+xml" href="/icon.svg">
     <link rel="apple-touch-icon" href="/icon.svg">
 
-    <link href="https://fonts.googleapis.com/css2?family=Georgia&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Georgia&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
     <style>
@@ -217,7 +220,7 @@ HTML_TEMPLATE = """
         a[href*="render.com"][style*="fixed"],
         a[href*="render.com"][style*="absolute"],
         a[href*="render.com"][class*="badge"],
-        div[style*="z-index"][style*="fixed"] a[href*="render.com"] {
+        div[style*="z-index"] [style*="fixed"] a[href*="render.com"] {
             display: none !important;
             visibility: hidden !important;
             pointer-events: none !important;
@@ -763,7 +766,6 @@ HTML_TEMPLATE = """
             </div>
         `;
         document.getElementById('pdfViewerModal').classList.add('active');
-        history.pushState({ pdfOpen: true }, '');
 
         try {
             const loadingTask = pdfjsLib.getDocument(url);
@@ -830,7 +832,7 @@ HTML_TEMPLATE = """
     function adjustZoom(delta) {
         const nextZoom = currentZoomMultiplier + delta;
         if (nextZoom >= 0.5 && nextZoom <= 3.0) {
-            currentZoomMultiplier = Math.round(nextZoom * 100) / 100;
+            currentZoomMultiplier = Math.round(nextZoom * 100)/100;
             updateZoomDisplay();
             renderPdfPages();
         }
@@ -842,24 +844,14 @@ HTML_TEMPLATE = """
         renderPdfPages();
     }
 
-    function closePdfViewer(isPopState = false) {
+    function closePdfViewer() {
         const viewer = document.getElementById('pdfViewerModal');
         if (viewer.classList.contains('active')) {
             viewer.classList.remove('active');
             document.getElementById('pdf-scroll-container').innerHTML = '';
             activePdfDoc = null;
-            if (!isPopState && history.state && history.state.pdfOpen) {
-                history.back();
-            }
         }
     }
-
-    window.addEventListener('popstate', (e) => {
-        const viewer = document.getElementById('pdfViewerModal');
-        if (viewer && viewer.classList.contains('active')) {
-            closePdfViewer(true);
-        }
-    });
 
     function openEditModal(id, title, course, sem, year) {
         document.getElementById('edit_item_id').value = id;
@@ -895,12 +887,11 @@ HTML_TEMPLATE = """
 
 def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallback_year: str):
     lower = filename.lower()
-    
     detected_year = fallback_year.strip() if fallback_year.strip() else None
     if not detected_year:
         year_match = re.search(r'\b(20[1-2][0-9])\b', lower)
         detected_year = year_match.group(1) if year_match else "2024"
-
+    
     detected_sem = fallback_sem
     if fallback_sem == "auto":
         sem_match = re.search(r'(?:sem(?:ester)?[\s_-]*([1-6])|\bs([1-6])\b)', lower)
@@ -913,15 +904,14 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
     detected_course = fallback_course
     if fallback_course == "auto":
         botany_keywords = [
-            "botany", "plant", "archegoniate", "bryophyte", "pteridophyte", 
-            "gymnosperm", "angiosperm", "algae", "microbiology", "mycology", 
+            "botany", "plant", "archegoniate", "bryophyte", "pteridophyte",
+            "gymnosperm", "angiosperm", "algae", "microbiology", "mycology",
             "phytopathology", "plant physiology", "plant metabolism", "plant ecology"
         ]
         zoology_keywords = [
-            "zoology", "animal", "chordata", "non-chordata", "physiology", 
+            "zoology", "animal", "chordata", "non-chordata", "physiology",
             "developmental biology", "genetics", "evolution"
         ]
-        
         if any(k in lower for k in botany_keywords):
             detected_course = "B.Sc (Hons) Botany"
         elif any(k in lower for k in zoology_keywords):
@@ -964,12 +954,10 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
     is_admin = request.cookies.get("du_admin_session") == "authenticated"
     conn = get_db()
     cursor = conn.cursor()
-
     cursor.execute("SELECT course, COUNT(*) FROM du_resources GROUP BY course")
     counts = dict(cursor.fetchall())
-
+    
     main_view_content = ""
-
     if not course and not q.strip():
         folders_grid = '<div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">Select Course Folder</div>'
         folders_grid += '<div class="folder-grid">'
@@ -984,7 +972,6 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
             </a>
             """
         folders_grid += '</div>'
-
         search_bar = """
         <form method="GET" action="/">
             <div class="search-box" style="margin-top: 10px;">
@@ -996,7 +983,6 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
     else:
         query = "SELECT id, title, course, semester, year, type, url_or_name, file_size FROM du_resources WHERE 1=1"
         params = []
-
         if course:
             query += " AND course = ?"
             params.append(course)
@@ -1007,13 +993,13 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
             query += " AND (LOWER(title) LIKE ? OR LOWER(course) LIKE ? OR LOWER(year) LIKE ?)"
             wc = f"%{q.strip().lower()}%"
             params.extend([wc, wc, wc])
-
         query += " ORDER BY id DESC"
+        
         cursor.execute(query, tuple(params))
         records = cursor.fetchall()
 
         matched_tile = next((t for t in COURSE_TILES if t["name"] == course), None)
-        folder_icon = matched_tile["icon"] if matched_tile else "📁"
+        folder_icon = matched_tile["icon"] if matched_tile else ""
         folder_display_name = matched_tile["label"] if matched_tile else (course or f"Search: '{q}'")
 
         header_bar = f"""
@@ -1030,7 +1016,7 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
         <form method="GET" action="/">
             <input type="hidden" name="course" value="{course}">
             <div class="search-box">
-                <input type="text" name="q" value="{q}" placeholder="⚡ Live search in this folder..." onkeyup="filterCardsLive(this.value)">
+                <input type="text" name="q" value="{q}" placeholder="🔍 Live search in this folder..." onkeyup="filterCardsLive(this.value)">
             </div>
             <div class="filters">
                 <select name="sem" onchange="this.form.submit()">{ "".join(f'<option value="{s}" {"selected" if s == sem else ""}>{s}</option>' for s in SEMESTERS) }</select>
@@ -1048,7 +1034,7 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
                 if r_type == "pdf":
                     action_btn = f"""
                     <div style="margin-top: 10px;">
-                        <button class="btn-pill" onclick="openPdfViewer('/view/{item_id}', '{safe_title_view}')">View</button>
+                        <button class="btn-pill" onclick="openPdfViewer('/view/{item_id}', '{safe_title_view}')">View Document</button>
                     </div>
                     """
                 else:
@@ -1060,7 +1046,7 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
                     safe_c = c.replace("'", "\\'")
                     admin_opts = f"""
                     <div class="admin-actions">
-                        <button class="edit-btn" onclick="openEditModal({item_id}, '{safe_title}', '{safe_c}', '{s}', '{y}')">✎ Edit</button>
+                        <button class="edit-btn" onclick="openEditModal({item_id}, '{safe_title}', '{safe_c}', '{s}', '{y}')">Edit</button>
                         <form action="/delete/{item_id}" method="POST" onsubmit="return confirm('Delete paper?');">
                             <button type="submit" class="del-btn">✕</button>
                         </form>
@@ -1068,7 +1054,6 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
                     """
 
                 card_search_data = f"{title.lower()} {c.lower()} {s.lower()} {y.lower()}"
-
                 cards_html += f"""
                 <div class="card card-item" data-search-text="{card_search_data}">
                     <div>
@@ -1077,7 +1062,9 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
                             {admin_opts}
                         </div>
                         <div class="card-title">{title}</div>
-                        <div class="card-meta">🎓 {s} &nbsp;•&nbsp; 📅 {y} &nbsp;•&nbsp; 💾 {size}</div>
+                        <div class="card-meta">
+                            {s} &nbsp; &nbsp; {y} &nbsp; &nbsp; {size}
+                        </div>
                     </div>
                     {action_btn}
                 </div>
@@ -1093,15 +1080,15 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
 
     if is_admin:
         admin_header_btn = '<a href="/logout" class="admin-lock-btn">Logout</a>'
-        admin_banner_html = '<div class="admin-banner"><span>🔓 Host Controls Unlocked</span><a href="/logout">Lock</a></div>'
+        admin_banner_html = '<div class="admin-banner"><span>⚡ Host Controls Unlocked</span><a href="/logout">Lock</a></div>'
         fab_controls = """
         <div class="fab-bar">
-            <button class="fab" onclick="openModal('uploadModal')">📁 Batch Upload</button>
+            <button class="fab" onclick="openModal('uploadModal')">📤 Batch Upload</button>
             <button class="fab" style="background: var(--caramel);" onclick="openModal('linkModal')">🔗 Add Link</button>
         </div>
         """
     else:
-        admin_header_btn = '<button onclick="openModal(\'loginModal\')" class="admin-lock-btn">🔒 Admin</button>'
+        admin_header_btn = '<button onclick="openModal(\'loginModal\')" class="admin-lock-btn">Admin</button>'
         admin_banner_html = ""
         fab_controls = ""
 
@@ -1112,7 +1099,6 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
     content = content.replace("{admin_header_btn}", admin_header_btn)
     content = content.replace("{admin_banner_html}", admin_banner_html)
     content = content.replace("{fab_controls}", fab_controls)
-
     return HTMLResponse(content=content)
 
 @app.post("/login")
@@ -1143,10 +1129,11 @@ async def upload_files(
     conn = get_db()
     cursor = conn.cursor()
     last_detected_course = None
+
     for file in files:
         if file.filename.lower().endswith(".pdf"):
             data = await file.read()
-            size_mb = f"{len(data) / (1024 * 1024):.2f} MB"
+            size_mb = f"{len(data) / (1024*1024):.2f} MB"
             clean_title, detected_course, detected_sem, detected_year = parse_filename(
                 file.filename, course, sem, year
             )
@@ -1155,9 +1142,9 @@ async def upload_files(
                 INSERT INTO du_resources (title, course, semester, year, type, url_or_name, file_data, file_size)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (clean_title, detected_course, detected_sem, detected_year, "pdf", file.filename, data, size_mb))
+
     conn.commit()
     conn.close()
-
     redirect_url = f"/?course={urllib.parse.quote_plus(last_detected_course)}" if last_detected_course else "/"
     return RedirectResponse(url=redirect_url, status_code=303)
 
@@ -1182,7 +1169,6 @@ def edit_item(
     """, (title, course, sem, year, item_id))
     conn.commit()
     conn.close()
-
     return RedirectResponse(url=f"/?course={urllib.parse.quote_plus(course)}", status_code=303)
 
 @app.post("/add-link")
@@ -1213,6 +1199,7 @@ def view_pdf(item_id: int):
     cursor.execute("SELECT title, file_data FROM du_resources WHERE id = ?", (item_id,))
     row = cursor.fetchone()
     conn.close()
+
     if row and row[1]:
         return StreamingResponse(
             io.BytesIO(row[1]),
