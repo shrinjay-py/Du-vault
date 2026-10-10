@@ -608,7 +608,7 @@ HTML_TEMPLATE = """
     <a href="/" class="brand-title">DU VAULT</a>
     <div class="brand-right">
         <div class="founder-tag">
-            <div>Founded by <span class="founder-name">Shrinjay</span></div>
+            <div> C/B- <span class="founder-name">Shrinjay</span></div>
             <span class="college-subtag">(Hansraj College)</span>
         </div>
         {admin_header_btn}
