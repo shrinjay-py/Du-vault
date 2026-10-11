@@ -694,6 +694,14 @@ select {
         if (loader) loader.classList.add('fade-out');
     }
     window.addEventListener('load', () => { setTimeout(hideLoader, 200); });
+    
+    // Fix bfcache restoration lag when using right swipe or browser back button
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+            hideLoader();
+        }
+    });
+
     document.addEventListener('DOMContentLoaded', () => {
         const triggers = document.querySelectorAll('a.folder-card, a.back-folder-btn');
         triggers.forEach(el => {
