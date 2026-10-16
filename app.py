@@ -118,9 +118,10 @@ SEMESTERS = ["All Semesters", "Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 
 UNSORTED = "Unsorted"
 
 # ───────────────────────── SUBJECT CATALOGUE ─────────────────────────
-# Course -> Semester -> subject names. EDIT THIS to match your exact DU syllabus.
-# Subjects you type while uploading/editing that are not listed here are added automatically.
-CURRICULUM = {
+# CURRICULUM is the live subject list, loaded from the du_subjects table (managed by the admin in the app).
+# CURRICULUM_SEED is only used ONCE, to fill an empty du_subjects table on first start.
+CURRICULUM = {}
+CURRICULUM_SEED = {
     "B.Sc (Hons) Botany": {
         "Sem 1": ["Biomolecules & Cell Biology", "Phycology & Microbiology"],
         "Sem 2": ["Mycology & Phytopathology", "Archegoniate"],
@@ -367,6 +368,26 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
 
 
 # ───────────────────────── DATABASE ─────────────────────────
+def reload_curriculum(cursor):
+    """Refresh the in-memory subject list from the du_subjects table."""
+    cursor.execute("SELECT course, semester, name FROM du_subjects ORDER BY id")
+    fresh = {}
+    for c, sm, n in cursor.fetchall():
+        fresh.setdefault(c, {}).setdefault(sm, []).append(n)
+    CURRICULUM.clear()
+    CURRICULUM.update(fresh)
+
+
+def ensure_subject(cursor, course: str, sem: str, name: str):
+    """Register a subject typed during upload/edit if it isn't in the list yet."""
+    if not name or name == UNSORTED:
+        return
+    if any(name in names for names in CURRICULUM.get(course, {}).values()):
+        return
+    cursor.execute("INSERT OR IGNORE INTO du_subjects (course, semester, name) VALUES (?, ?, ?)", (course, sem, name))
+    reload_curriculum(cursor)
+
+
 def init_db():
     conn = get_db()
     cursor = conn.cursor()
@@ -391,6 +412,34 @@ def init_db():
         conn.commit()
     except Exception:
         pass  # column already exists
+    # Subject folders table (add / rename / move / delete are done from the app)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS du_subjects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            course TEXT NOT NULL,
+            semester TEXT NOT NULL,
+            name TEXT NOT NULL,
+            UNIQUE(course, name)
+        )
+    """)
+    conn.commit()
+    cursor.execute("SELECT COUNT(*) FROM du_subjects")
+    if cursor.fetchone()[0] == 0:
+        for c, sems in CURRICULUM_SEED.items():
+            for sm, names in sems.items():
+                for n in names:
+                    cursor.execute("INSERT OR IGNORE INTO du_subjects (course, semester, name) VALUES (?, ?, ?)", (c, sm, n))
+        conn.commit()
+    # Register subjects that so far exist only on papers (typed during earlier uploads)
+    cursor.execute(
+        "SELECT course, subject, MIN(semester) FROM du_resources "
+        "WHERE subject IS NOT NULL AND subject != '' AND subject != ? GROUP BY course, subject",
+        (UNSORTED,),
+    )
+    for c, subj, sm in cursor.fetchall():
+        cursor.execute("INSERT OR IGNORE INTO du_subjects (course, semester, name) VALUES (?, ?, ?)", (c, sm, subj))
+    conn.commit()
+    reload_curriculum(cursor)
     # One-time sort of old papers into subjects using their titles
     cursor.execute("SELECT id, title, course, semester FROM du_resources WHERE subject IS NULL OR subject = ''")
     rows = cursor.fetchall()
@@ -654,6 +703,12 @@ header {
 .subject-title { font-size: 0.84rem; font-weight: 700; line-height: 1.3; }
 .subject-count { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); background: var(--bg-latte); padding: 2px 10px; border-radius: 10px; margin-top: 8px; }
 
+.subject-wrap { position: relative; display: flex; }
+.subject-wrap .subject-card { flex: 1; }
+.subject-admin { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
+.sub-btn { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border-latte); background: #fff; color: var(--text-dark); font-size: 0.72rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.sub-btn:hover { background: var(--bg-latte); }
+.sub-btn.danger { color: #BA1A1A; }
 .search-box input { width: 100%; padding: 12px 20px; border-radius: 25px; border: 1px solid var(--border-latte); background: var(--card-foam); font-size: 0.95rem; outline: none; margin-bottom: 12px; }
 .filters { display: flex; gap: 10px; margin-bottom: 16px; }
 select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var(--border-latte); background: var(--card-foam); font-size: 0.88rem; outline: none; }
@@ -804,6 +859,30 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
         </form>
     </div>
 </div>
+<div class="modal" id="subjectAddModal" onclick="if(event.target === this) closeModal('subjectAddModal')">
+    <div class="modal-content">
+        <div class="modal-title">Add Subject</div>
+        <form action="/subject/add" method="POST" onsubmit="showLoader()">
+            <input type="hidden" name="course" id="sa_course">
+            <div class="form-group"><label>Subject name</label><input type="text" name="name" maxlength="80" placeholder="e.g. Cell Biology" required></div>
+            <div class="form-group"><label>Semester</label><select name="sem">{upload_sem_options}</select></div>
+            <button type="submit" class="btn-pill btn-caramel" style="margin-top: 8px;">Add Subject</button>
+        </form>
+    </div>
+</div>
+<div class="modal" id="subjectEditModal" onclick="if(event.target === this) closeModal('subjectEditModal')">
+    <div class="modal-content">
+        <div class="modal-title">Rename / Move Subject</div>
+        <form action="/subject/edit" method="POST" onsubmit="showLoader()">
+            <input type="hidden" name="course" id="se_course">
+            <input type="hidden" name="old_name" id="se_old">
+            <div class="form-group"><label>Subject name</label><input type="text" name="new_name" id="se_name" maxlength="80" required></div>
+            <div class="form-group"><label>Semester</label><select name="sem" id="se_sem">{upload_sem_options}</select></div>
+            <div class="helper-text">Renaming also updates every paper filed under this subject.</div>
+            <button type="submit" class="btn-pill" style="margin-top: 12px;">Save Changes</button>
+        </form>
+    </div>
+</div>
 <div class="modal" id="loginModal" onclick="if(event.target === this) closeModal('loginModal')">
     <div class="modal-content">
         <div class="modal-title">Host Admin Access</div>
@@ -940,6 +1019,18 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
         document.getElementById('edit_year').value = d.year;
         openModal('editModal');
     }
+    function openAddSubject(btn) {
+        document.getElementById('sa_course').value = btn.dataset.course;
+        openModal('subjectAddModal');
+    }
+    function openSubjectModal(btn) {
+        const d = btn.dataset;
+        document.getElementById('se_course').value = d.course;
+        document.getElementById('se_old').value = d.name;
+        document.getElementById('se_name').value = d.name;
+        document.getElementById('se_sem').value = d.sem;
+        openModal('subjectEditModal');
+    }
     function filterCardsLive(query) {
         const term = query.toLowerCase().trim();
         document.querySelectorAll('.card-item').forEach(card => {
@@ -959,7 +1050,29 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
 
 
 # ───────────────────────── VIEW BUILDERS ─────────────────────────
-def subject_card_html(course: str, name: str, count: int) -> str:
+def subject_card_html(course: str, name: str, count: int, admin: bool = False, sem: str = "") -> str:
+    card = _subject_card_core(course, name, count)
+    if not admin:
+        return card
+    return f"""
+    <div class="subject-wrap">
+        {card}
+        <div class="subject-admin">
+            <button type="button" class="sub-btn" title="Rename / move to another semester"
+                data-course="{esc(course)}" data-name="{esc(name)}" data-sem="{esc(sem)}"
+                onclick="openSubjectModal(this)">✎</button>
+            <form action="/subject/delete" method="POST"
+                onsubmit="return confirm('Delete this subject folder? Its papers are kept and moved to Unsorted.');">
+                <input type="hidden" name="course" value="{esc(course)}">
+                <input type="hidden" name="name" value="{esc(name)}">
+                <button type="submit" class="sub-btn danger" title="Delete subject">✕</button>
+            </form>
+        </div>
+    </div>
+    """
+
+
+def _subject_card_core(course: str, name: str, count: int) -> str:
     g1, g2 = subject_gradient(name)
     href = f"/?course={urlq(course)}&subject={urlq(name)}"
     label = "paper" if count == 1 else "papers"
@@ -994,6 +1107,7 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
     q = q.strip()
     conn = get_db()
     cursor = conn.cursor()
+    reload_curriculum(cursor)
     main_view_content = ""
 
     # ── LEVEL 1: Home → course folders
@@ -1042,10 +1156,15 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
         tile = next((t for t in COURSE_TILES if t["name"] == course), None)
         icon = tile["icon"] if tile else "📁"
         label = tile["label"] if tile else course
+        add_btn = (
+            f'<button type="button" class="back-folder-btn" style="border:none;cursor:pointer;background:var(--caramel);" '
+            f'data-course="{esc(course)}" onclick="openAddSubject(this)">➕ Add Subject</button>'
+            if admin else ""
+        )
         header_bar = f"""
         <div class="folder-header-bar">
             <div class="folder-header-title"><span>{icon}</span><span>{esc(label)}</span></div>
-            <a href="/" class="back-folder-btn">← All Courses</a>
+            <div style="display:flex; gap:8px; align-items:center;">{add_btn}<a href="/" class="back-folder-btn">← All Courses</a></div>
         </div>
         """
         search_form = f"""
@@ -1059,7 +1178,7 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
             names = seeded.get(sem_label, []) + extra.get(sem_label, [])
             if not names:
                 continue
-            cards = "".join(subject_card_html(course, n, sub_counts.get(n, 0)) for n in names)
+            cards = "".join(subject_card_html(course, n, sub_counts.get(n, 0), admin, sem_label) for n in names)
             sections += f'<div class="sem-heading">{esc(sem_label.replace("Sem", "Semester"))}</div><div class="subject-grid">{cards}</div>'
         if sub_counts.get(UNSORTED):
             sections += (
@@ -1265,6 +1384,7 @@ async def upload_files(
             clean_title, detected_course, detected_sem, detected_year = parse_filename(file.filename, course, sem, year)
             detected_subject = resolve_subject(detected_course, detected_sem, subject, file.filename)
             last_course, last_subject = detected_course, detected_subject
+            ensure_subject(cursor, detected_course, detected_sem, detected_subject)
             cursor.execute(
                 """
                 INSERT INTO du_resources (title, course, semester, year, type, url_or_name, file_data, file_size, subject)
@@ -1305,6 +1425,7 @@ def edit_item(
         """,
         (title, course, sem, year, final_subject, item_id),
     )
+    ensure_subject(cursor, course, sem, final_subject)
     conn.commit()
     conn.close()
     return folder_redirect(course, final_subject)
@@ -1335,9 +1456,91 @@ def add_link(
         """,
         (title, course, sem, "Web", "link", url.strip(), None, "Link", final_subject),
     )
+    ensure_subject(cursor, course, sem, final_subject)
     conn.commit()
     conn.close()
     return folder_redirect(course, final_subject)
+
+
+def clean_subject_name(name: str) -> str:
+    return " ".join(name.split())[:80]
+
+
+def subject_exists(course: str, name: str, ignore: str = "") -> bool:
+    for names in CURRICULUM.get(course, {}).values():
+        for n in names:
+            if n.casefold() == name.casefold() and n.casefold() != ignore.casefold():
+                return True
+    return False
+
+
+@app.post("/subject/add")
+def subject_add(request: Request, course: str = Form(...), sem: str = Form(...), name: str = Form(...)):
+    if not is_admin(request):
+        return HTMLResponse("Unauthorized.", status_code=403)
+    name = clean_subject_name(name)
+    if course not in COURSES[1:] or sem not in SEMESTERS[1:] or not name or name.casefold() == UNSORTED.casefold():
+        return HTMLResponse("Invalid course, semester or subject name.", status_code=400)
+    conn = get_db()
+    cursor = conn.cursor()
+    reload_curriculum(cursor)
+    if subject_exists(course, name):
+        conn.close()
+        return HTMLResponse("A subject with this name already exists in this course.", status_code=400)
+    cursor.execute("INSERT INTO du_subjects (course, semester, name) VALUES (?, ?, ?)", (course, sem, name))
+    conn.commit()
+    reload_curriculum(cursor)
+    conn.close()
+    return folder_redirect(course)
+
+
+@app.post("/subject/edit")
+def subject_edit(
+    request: Request,
+    course: str = Form(...),
+    old_name: str = Form(...),
+    new_name: str = Form(...),
+    sem: str = Form(...),
+):
+    if not is_admin(request):
+        return HTMLResponse("Unauthorized.", status_code=403)
+    new_name = clean_subject_name(new_name)
+    if course not in COURSES[1:] or sem not in SEMESTERS[1:] or not new_name or new_name.casefold() == UNSORTED.casefold():
+        return HTMLResponse("Invalid course, semester or subject name.", status_code=400)
+    conn = get_db()
+    cursor = conn.cursor()
+    reload_curriculum(cursor)
+    if subject_exists(course, new_name, ignore=old_name):
+        conn.close()
+        return HTMLResponse("Another subject in this course already has that name.", status_code=400)
+    cursor.execute(
+        "UPDATE du_subjects SET name = ?, semester = ? WHERE course = ? AND name = ?",
+        (new_name, sem, course, old_name),
+    )
+    if new_name != old_name:
+        cursor.execute(
+            "UPDATE du_resources SET subject = ? WHERE course = ? AND subject = ?",
+            (new_name, course, old_name),
+        )
+    conn.commit()
+    reload_curriculum(cursor)
+    conn.close()
+    return folder_redirect(course)
+
+
+@app.post("/subject/delete")
+def subject_delete(request: Request, course: str = Form(...), name: str = Form(...)):
+    """Deletes the subject folder only. Its papers are kept and moved to 'Unsorted'."""
+    if not is_admin(request):
+        return HTMLResponse("Unauthorized.", status_code=403)
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE du_resources SET subject = ? WHERE course = ? AND subject = ?", (UNSORTED, course, name))
+    cursor.execute("DELETE FROM du_subjects WHERE course = ? AND name = ?", (course, name))
+    conn.commit()
+    reload_curriculum(cursor)
+    conn.close()
+    return folder_redirect(course)
 
 
 @app.get("/view/{item_id}")
