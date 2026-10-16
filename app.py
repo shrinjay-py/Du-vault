@@ -6,6 +6,9 @@ import time
 import zlib
 import html
 import hashlib
+import json
+import difflib
+import unicodedata
 import urllib.parse
 import libsql_experimental as sqlite3
 from fastapi import FastAPI, UploadFile, File, Form, Response, Request
@@ -121,6 +124,7 @@ UNSORTED = "Unsorted"
 # CURRICULUM is the live subject list, loaded from the du_subjects table (managed by the admin in the app).
 # CURRICULUM_SEED is only used ONCE, to fill an empty du_subjects table on first start.
 CURRICULUM = {}
+SUBJECT_STYLE = {}  # (course, subject) -> (custom icon, colour index)
 CURRICULUM_SEED = {
     "B.Sc (Hons) Botany": {
         "Sem 1": ["Biomolecules & Cell Biology", "Phycology & Microbiology"],
@@ -262,13 +266,71 @@ def subject_gradient(name: str):
     return GRADIENTS[zlib.crc32(name.encode()) % len(GRADIENTS)]
 
 
+def icon_for(course: str, name: str) -> str:
+    """Admin-chosen icon if set, otherwise the automatic one."""
+    custom = SUBJECT_STYLE.get((course, name), ("", ""))[0]
+    return custom or subject_icon(name)
+
+
+def gradient_for(course: str, name: str):
+    col = SUBJECT_STYLE.get((course, name), ("", ""))[1]
+    if col.isdigit() and int(col) < len(GRADIENTS):
+        return GRADIENTS[int(col)]
+    return subject_gradient(name)
+
+
 # ───────────────────────── DETECTION LOGIC ─────────────────────────
-STOP_WORDS = {"and", "of", "the", "in", "to", "for", "with"}
+STOP_WORDS = {"and", "of", "the", "in", "to", "for", "with", "a", "an", "on"}
+ROMAN = {"i": "1", "ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6"}
+CONFUSABLES = str.maketrans({
+    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "х": "x", "у": "y", "і": "i", "ј": "j", "ѕ": "s", "ο": "o",
+})
+INVISIBLE = re.compile("[\u200b-\u200f\u2060\ufeff\u00ad]")
+
+
+def fold(text: str) -> str:
+    """Lower-case and flatten fancy fonts (𝑷𝒍𝒂𝒏𝒕, ｐｌａｎｔ, ligatures), accents, odd digits and invisible characters."""
+    text = unicodedata.normalize("NFKD", str(text))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = INVISIBLE.sub("", text)
+    return text.lower().translate(CONFUSABLES)
 
 
 def norm(text: str) -> str:
-    text = text.lower().replace("&", " and ")
+    text = fold(text).replace("&", " and ")
     return " " + re.sub(r"[^a-z0-9+]+", " ", text).strip() + " "
+
+
+def _stem(w: str) -> str:
+    return w[:-1] if len(w) > 3 and w.endswith("s") else w
+
+
+def tokens(text: str):
+    """Words of a name, ignoring symbols, case, plurals, 'and'/'&', and treating I/II/III like 1/2/3."""
+    out = []
+    for w in norm(text).split():
+        if w in STOP_WORDS:
+            continue
+        out.append(_stem(ROMAN.get(w, w)))
+    return out
+
+
+def _tok_eq(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    if len(a) >= 6 and len(b) >= 6:  # tolerate small typos in long words only
+        return difflib.SequenceMatcher(None, a, b).ratio() >= 0.9
+    return False
+
+
+def subject_score(subject_tokens, text_tokens) -> int:
+    """All words of the subject must appear in the text (any order). Longer subject names score higher."""
+    if not subject_tokens:
+        return 0
+    for st in subject_tokens:
+        if not any(_tok_eq(st, tt) for tt in text_tokens):
+            return 0
+    return len(subject_tokens)
 
 
 def kw_in(text: str, keywords) -> bool:
@@ -285,17 +347,18 @@ def detect_subject(course: str, sem: str, text: str) -> str:
     cur = CURRICULUM.get(course)
     if not cur:
         return UNSORTED
-    t = norm(text)
-    order = list(cur.get(sem, [])) + [s for sm, names in cur.items() if sm != sem for s in names]
-    for name in order:
-        if any(norm(k) in t for k in [name] + SUBJECT_ALIASES.get(name, [])):
-            return name
-    words = set(t.split())
-    for name in order:
-        toks = [w for w in norm(name).split() if w not in STOP_WORDS and len(w) > 3]
-        if toks and all(w in words for w in toks):
-            return name
-    return UNSORTED
+    tt = tokens(text)
+    if not tt:
+        return UNSORTED
+    best, best_key = UNSORTED, (0, 0)
+    for sm, names in cur.items():
+        for name in names:
+            score = max(subject_score(tokens(k), tt) for k in [name] + SUBJECT_ALIASES.get(name, []))
+            if score:
+                key = (score, 1 if sm == sem else 0)  # longest match wins; same semester breaks ties
+                if key > best_key:
+                    best, best_key = name, key
+    return best
 
 
 def resolve_subject(course: str, sem: str, typed: str, text: str) -> str:
@@ -346,10 +409,10 @@ def detect_course(lower: str) -> str:
 
 
 def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallback_year: str):
-    lower = filename.lower()
+    lower = fold(filename)
     detected_year = fallback_year.strip() if fallback_year.strip() else None
     if not detected_year:
-        year_match = re.search(r"\b(20[1-2][0-9])\b", lower)
+        year_match = re.search(r"(?<!\d)(20[1-2][0-9])(?!\d)", lower)
         detected_year = year_match.group(1) if year_match else "2024"
     detected_sem = fallback_sem
     if fallback_sem == "auto":
@@ -362,20 +425,24 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
     detected_course = fallback_course
     if fallback_course == "auto":
         detected_course = detect_course(lower)
-    base = os.path.splitext(filename)[0]
+    base = unicodedata.normalize("NFKC", os.path.splitext(filename)[0])
     clean_title = re.sub(r"[_]+", " ", base).strip().title()
     return clean_title, detected_course, detected_sem, detected_year
 
 
 # ───────────────────────── DATABASE ─────────────────────────
 def reload_curriculum(cursor):
-    """Refresh the in-memory subject list from the du_subjects table."""
-    cursor.execute("SELECT course, semester, name FROM du_subjects ORDER BY id")
-    fresh = {}
-    for c, sm, n in cursor.fetchall():
+    """Refresh the in-memory subject list (and custom icons/colours) from the du_subjects table."""
+    cursor.execute("SELECT course, semester, name, icon, color FROM du_subjects ORDER BY id")
+    fresh, style = {}, {}
+    for c, sm, n, ic, col in cursor.fetchall():
         fresh.setdefault(c, {}).setdefault(sm, []).append(n)
+        if ic or col:
+            style[(c, n)] = (ic or "", col or "")
     CURRICULUM.clear()
     CURRICULUM.update(fresh)
+    SUBJECT_STYLE.clear()
+    SUBJECT_STYLE.update(style)
 
 
 def ensure_subject(cursor, course: str, sem: str, name: str):
@@ -423,6 +490,12 @@ def init_db():
         )
     """)
     conn.commit()
+    for col in ("icon", "color"):
+        try:
+            cursor.execute(f"ALTER TABLE du_subjects ADD COLUMN {col} TEXT")
+            conn.commit()
+        except Exception:
+            pass  # column already exists
     cursor.execute("SELECT COUNT(*) FROM du_subjects")
     if cursor.fetchone()[0] == 0:
         for c, sems in CURRICULUM_SEED.items():
@@ -709,6 +782,14 @@ header {
 .sub-btn { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border-latte); background: #fff; color: var(--text-dark); font-size: 0.72rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .sub-btn:hover { background: var(--bg-latte); }
 .sub-btn.danger { color: #BA1A1A; }
+.emoji-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.emoji-opt { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border-latte); background: #fff; font-size: 1.1rem; cursor: pointer; }
+.emoji-opt:hover { background: var(--bg-latte); }
+.color-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.color-opt { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; font-size: 0.6rem; font-weight: 700; color: #fff; }
+.color-opt.auto { background: var(--bg-latte); color: var(--text-muted); border: 1px dashed var(--border-latte); }
+.color-opt.sel { border-color: var(--espresso); box-shadow: inset 0 0 0 2px #fff; }
+.notice { background: #EAF3E3; border: 1px solid #B9D3A8; color: #2F5A1F; padding: 10px 14px; border-radius: 12px; font-size: 0.85rem; font-weight: 600; margin-bottom: 12px; }
 .search-box input { width: 100%; padding: 12px 20px; border-radius: 25px; border: 1px solid var(--border-latte); background: var(--card-foam); font-size: 0.95rem; outline: none; margin-bottom: 12px; }
 .filters { display: flex; gap: 10px; margin-bottom: 16px; }
 select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var(--border-latte); background: var(--card-foam); font-size: 0.88rem; outline: none; }
@@ -866,6 +947,14 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
             <input type="hidden" name="course" id="sa_course">
             <div class="form-group"><label>Subject name</label><input type="text" name="name" maxlength="80" placeholder="e.g. Cell Biology" required></div>
             <div class="form-group"><label>Semester</label><select name="sem">{upload_sem_options}</select></div>
+            <div class="form-group"><label>Icon <span style="font-weight:400;color:var(--text-muted);">(optional: pick one or type any emoji)</span></label>
+                <input type="text" name="icon" id="sa_icon" maxlength="8" placeholder="Auto" autocomplete="off">
+                <div class="emoji-grid" data-target="sa_icon"></div></div>
+            <div class="form-group"><label>Colour</label><input type="hidden" name="color" id="sa_color" value=""><div class="color-grid" data-target="sa_color"></div></div>
+            <div class="form-group"><label style="display:flex; gap:8px; align-items:flex-start; font-weight:500;">
+                <input type="checkbox" name="pull_from_others" value="1" style="width:auto; margin-top:3px;">
+                <span>Also pull matching papers from other subjects in this course</span></label>
+                <div class="helper-text">Papers in "Unsorted" whose names match are always moved in automatically.</div></div>
             <button type="submit" class="btn-pill btn-caramel" style="margin-top: 8px;">Add Subject</button>
         </form>
     </div>
@@ -878,6 +967,10 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
             <input type="hidden" name="old_name" id="se_old">
             <div class="form-group"><label>Subject name</label><input type="text" name="new_name" id="se_name" maxlength="80" required></div>
             <div class="form-group"><label>Semester</label><select name="sem" id="se_sem">{upload_sem_options}</select></div>
+            <div class="form-group"><label>Icon <span style="font-weight:400;color:var(--text-muted);">(empty = automatic)</span></label>
+                <input type="text" name="icon" id="se_icon" maxlength="8" placeholder="Auto" autocomplete="off">
+                <div class="emoji-grid" data-target="se_icon"></div></div>
+            <div class="form-group"><label>Colour</label><input type="hidden" name="color" id="se_color" value=""><div class="color-grid" data-target="se_color"></div></div>
             <div class="helper-text">Renaming also updates every paper filed under this subject.</div>
             <button type="submit" class="btn-pill" style="margin-top: 12px;">Save Changes</button>
         </form>
@@ -1019,8 +1112,42 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
         document.getElementById('edit_year').value = d.year;
         openModal('editModal');
     }
+    const GRADS = {gradients_json};
+    const EMOJIS = ['🌿','🌱','🌸','🍃','🌳','🌾','🍄','🌊','🦠','🔬','🧬','🧫','🧪','⚗️','🌍','💧','🔥','⚡','🧲','🔭','⚛️','📐','➕','📊','📈','💻','🧠','📖','⚖️','🏛️','🦴','🐟','🪼','🐣','🦁','🐝'];
+    function markColors(inputId) {
+        const val = document.getElementById(inputId).value;
+        const grid = document.querySelector('.color-grid[data-target="' + inputId + '"]');
+        grid.querySelectorAll('.color-opt').forEach(b => b.classList.toggle('sel', b.dataset.v === val));
+    }
+    function buildPickers() {
+        document.querySelectorAll('.emoji-grid').forEach(g => {
+            const input = document.getElementById(g.dataset.target);
+            EMOJIS.forEach(e => {
+                const b = document.createElement('button');
+                b.type = 'button'; b.className = 'emoji-opt'; b.textContent = e;
+                b.onclick = () => { input.value = e; };
+                g.appendChild(b);
+            });
+        });
+        document.querySelectorAll('.color-grid').forEach(g => {
+            const input = document.getElementById(g.dataset.target);
+            const make = (label, v, bg) => {
+                const b = document.createElement('button');
+                b.type = 'button'; b.className = 'color-opt' + (v === '' ? ' auto' : ''); b.dataset.v = v;
+                if (bg) b.style.background = bg; if (label) b.textContent = label;
+                b.onclick = () => { input.value = v; markColors(g.dataset.target); };
+                g.appendChild(b);
+            };
+            make('Auto', '', null);
+            GRADS.forEach((p, i) => make('', String(i), 'linear-gradient(145deg,' + p[0] + ',' + p[1] + ')'));
+        });
+    }
+    document.addEventListener('DOMContentLoaded', buildPickers);
     function openAddSubject(btn) {
         document.getElementById('sa_course').value = btn.dataset.course;
+        document.getElementById('sa_icon').value = '';
+        document.getElementById('sa_color').value = '';
+        markColors('sa_color');
         openModal('subjectAddModal');
     }
     function openSubjectModal(btn) {
@@ -1029,6 +1156,9 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
         document.getElementById('se_old').value = d.name;
         document.getElementById('se_name').value = d.name;
         document.getElementById('se_sem').value = d.sem;
+        document.getElementById('se_icon').value = d.icon || '';
+        document.getElementById('se_color').value = d.color || '';
+        markColors('se_color');
         openModal('subjectEditModal');
     }
     function filterCardsLive(query) {
@@ -1060,6 +1190,8 @@ def subject_card_html(course: str, name: str, count: int, admin: bool = False, s
         <div class="subject-admin">
             <button type="button" class="sub-btn" title="Rename / move to another semester"
                 data-course="{esc(course)}" data-name="{esc(name)}" data-sem="{esc(sem)}"
+                data-icon="{esc(SUBJECT_STYLE.get((course, name), ("", ""))[0])}"
+                data-color="{esc(SUBJECT_STYLE.get((course, name), ("", ""))[1])}"
                 onclick="openSubjectModal(this)">✎</button>
             <form action="/subject/delete" method="POST"
                 onsubmit="return confirm('Delete this subject folder? Its papers are kept and moved to Unsorted.');">
@@ -1073,12 +1205,12 @@ def subject_card_html(course: str, name: str, count: int, admin: bool = False, s
 
 
 def _subject_card_core(course: str, name: str, count: int) -> str:
-    g1, g2 = subject_gradient(name)
+    g1, g2 = gradient_for(course, name)
     href = f"/?course={urlq(course)}&subject={urlq(name)}"
     label = "paper" if count == 1 else "papers"
     return f"""
     <a href="{esc(href)}" class="subject-card" style="--g1:{g1};--g2:{g2}">
-        <div class="subject-icon"><span>{subject_icon(name)}</span></div>
+        <div class="subject-icon"><span>{esc(icon_for(course, name))}</span></div>
         <div class="subject-title">{esc(name)}</div>
         <div class="subject-count">{count} {label}</div>
     </a>
@@ -1102,7 +1234,7 @@ def crumbs_html(course: str, subject: str, q: str) -> str:
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, q: str = "", course: str = "", sem: str = "All Semesters", subject: str = ""):
+def index(request: Request, q: str = "", course: str = "", sem: str = "All Semesters", subject: str = "", notice: str = ""):
     admin = is_admin(request)
     q = q.strip()
     conn = get_db()
@@ -1161,10 +1293,17 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
             f'data-course="{esc(course)}" onclick="openAddSubject(this)">➕ Add Subject</button>'
             if admin else ""
         )
+        rescan_btn = (
+            f'<form action="/subject/rescan" method="POST" style="margin:0;">'
+            f'<input type="hidden" name="course" value="{esc(course)}">'
+            f'<button type="submit" class="back-folder-btn" style="border:none;cursor:pointer;" '
+            f'title="Move Unsorted papers into matching subjects">🔄 Re-sort</button></form>'
+            if admin else ""
+        )
         header_bar = f"""
         <div class="folder-header-bar">
             <div class="folder-header-title"><span>{icon}</span><span>{esc(label)}</span></div>
-            <div style="display:flex; gap:8px; align-items:center;">{add_btn}<a href="/" class="back-folder-btn">← All Courses</a></div>
+            <div style="display:flex; gap:8px; align-items:center;">{add_btn}{rescan_btn}<a href="/" class="back-folder-btn">← All Courses</a></div>
         </div>
         """
         search_form = f"""
@@ -1213,7 +1352,7 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
 
         tile = next((t for t in COURSE_TILES if t["name"] == course), None)
         if subject:
-            folder_icon = subject_icon(subject)
+            folder_icon = esc(icon_for(course, subject))
             folder_display_name = subject
             back_href = f"/?course={urlq(course)}" if course else "/"
             back_label = "← Subjects" if course else "← All Folders"
@@ -1290,6 +1429,9 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
             crumbs_html(course, subject, q) + header_bar + search_filter_form + f'<div id="cards-container">{cards_html}</div>'
         )
 
+    if notice:
+        main_view_content = f'<div class="notice">{esc(notice[:200])}</div>' + main_view_content
+
     # Subject suggestions for the upload / edit forms
     cursor.execute("SELECT DISTINCT subject FROM du_resources WHERE subject IS NOT NULL AND subject != ''")
     known = {r[0] for r in cursor.fetchall()}
@@ -1320,6 +1462,7 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
     content = content.replace("{upload_course_options}", up_course_opts)
     content = content.replace("{upload_sem_options}", up_sem_opts)
     content = content.replace("{subject_datalist}", subject_datalist)
+    content = content.replace("{gradients_json}", json.dumps(GRADIENTS))
     content = content.replace("{admin_header_btn}", admin_header_btn)
     content = content.replace("{admin_banner_html}", admin_banner_html)
     content = content.replace("{fab_controls}", fab_controls)
@@ -1352,10 +1495,12 @@ def logout():
 
 
 # ───────────────────────── ADMIN ACTIONS ─────────────────────────
-def folder_redirect(course: str, subject: str = "") -> RedirectResponse:
+def folder_redirect(course: str, subject: str = "", notice: str = "") -> RedirectResponse:
     url = f"/?course={urlq(course)}"
     if subject:
         url += f"&subject={urlq(subject)}"
+    if notice:
+        url += f"&notice={urlq(notice)}"
     return RedirectResponse(url=url, status_code=303)
 
 
@@ -1474,8 +1619,43 @@ def subject_exists(course: str, name: str, ignore: str = "") -> bool:
     return False
 
 
+def clean_icon(icon: str) -> str:
+    return (icon or "").strip()[:8]
+
+
+def clean_color(color: str) -> str:
+    color = (color or "").strip()
+    return color if color.isdigit() and int(color) < len(GRADIENTS) else ""
+
+
+def sort_papers(cursor, course: str, only: str = None, include_sorted: bool = False) -> int:
+    """Re-run name matching on a course's papers. Normally only touches 'Unsorted' ones."""
+    sql = "SELECT id, title, url_or_name, semester, subject, type FROM du_resources WHERE course = ?"
+    params = [course]
+    if not include_sorted:
+        sql += " AND (subject IS NULL OR subject = '' OR subject = ?)"
+        params.append(UNSORTED)
+    cursor.execute(sql, tuple(params))
+    moved = 0
+    for pid, title, fname, psem, cur_sub, rtype in cursor.fetchall():
+        found = detect_subject(course, psem, f"{title} {fname if rtype == 'pdf' else ''}")
+        if found == UNSORTED or found == cur_sub or (only and found != only):
+            continue
+        cursor.execute("UPDATE du_resources SET subject = ? WHERE id = ?", (found, pid))
+        moved += 1
+    return moved
+
+
 @app.post("/subject/add")
-def subject_add(request: Request, course: str = Form(...), sem: str = Form(...), name: str = Form(...)):
+def subject_add(
+    request: Request,
+    course: str = Form(...),
+    sem: str = Form(...),
+    name: str = Form(...),
+    icon: str = Form(""),
+    color: str = Form(""),
+    pull_from_others: str = Form(""),
+):
     if not is_admin(request):
         return HTMLResponse("Unauthorized.", status_code=403)
     name = clean_subject_name(name)
@@ -1487,11 +1667,20 @@ def subject_add(request: Request, course: str = Form(...), sem: str = Form(...),
     if subject_exists(course, name):
         conn.close()
         return HTMLResponse("A subject with this name already exists in this course.", status_code=400)
-    cursor.execute("INSERT INTO du_subjects (course, semester, name) VALUES (?, ?, ?)", (course, sem, name))
+    cursor.execute(
+        "INSERT INTO du_subjects (course, semester, name, icon, color) VALUES (?, ?, ?, ?, ?)",
+        (course, sem, name, clean_icon(icon), clean_color(color)),
+    )
     conn.commit()
     reload_curriculum(cursor)
+    moved = sort_papers(cursor, course, only=name, include_sorted=bool(pull_from_others))
+    conn.commit()
     conn.close()
-    return folder_redirect(course)
+    notice = (
+        f"Added '{name}' and moved {moved} matching paper(s) into it."
+        if moved else f"Added '{name}'. No existing papers matched its name."
+    )
+    return folder_redirect(course, notice=notice)
 
 
 @app.post("/subject/edit")
@@ -1501,6 +1690,8 @@ def subject_edit(
     old_name: str = Form(...),
     new_name: str = Form(...),
     sem: str = Form(...),
+    icon: str = Form(""),
+    color: str = Form(""),
 ):
     if not is_admin(request):
         return HTMLResponse("Unauthorized.", status_code=403)
@@ -1514,8 +1705,8 @@ def subject_edit(
         conn.close()
         return HTMLResponse("Another subject in this course already has that name.", status_code=400)
     cursor.execute(
-        "UPDATE du_subjects SET name = ?, semester = ? WHERE course = ? AND name = ?",
-        (new_name, sem, course, old_name),
+        "UPDATE du_subjects SET name = ?, semester = ?, icon = ?, color = ? WHERE course = ? AND name = ?",
+        (new_name, sem, clean_icon(icon), clean_color(color), course, old_name),
     )
     if new_name != old_name:
         cursor.execute(
@@ -1524,8 +1715,24 @@ def subject_edit(
         )
     conn.commit()
     reload_curriculum(cursor)
+    moved = sort_papers(cursor, course, only=new_name)
+    conn.commit()
     conn.close()
-    return folder_redirect(course)
+    return folder_redirect(course, notice=f"Saved. {moved} unsorted paper(s) matched '{new_name}'." if moved else "")
+
+
+@app.post("/subject/rescan")
+def subject_rescan(request: Request, course: str = Form(...)):
+    """Try again to place every 'Unsorted' paper of this course into a matching subject."""
+    if not is_admin(request):
+        return HTMLResponse("Unauthorized.", status_code=403)
+    conn = get_db()
+    cursor = conn.cursor()
+    reload_curriculum(cursor)
+    moved = sort_papers(cursor, course)
+    conn.commit()
+    conn.close()
+    return folder_redirect(course, notice=f"Re-sorted: {moved} paper(s) moved into matching subjects.")
 
 
 @app.post("/subject/delete")
