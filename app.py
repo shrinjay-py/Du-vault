@@ -117,7 +117,7 @@ COURSE_TILES = [
     {"name": "B.Sc (prog) Physical science with Chemistry", "icon": "🧲", "label": "Physical science with chem"},
 ]
 
-SEMESTERS = ["All Semesters", "Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 6"]
+SEMESTERS = ["All Semesters", "Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 6", "Sem 7", "Sem 8"]
 UNSORTED = "Unsorted"
 
 # ───────────────────────── SUBJECT CATALOGUE ─────────────────────────
@@ -133,6 +133,8 @@ CURRICULUM_SEED = {
         "Sem 4": ["Molecular Biology", "Plant Ecology & Phytogeography", "Plant Systematics"],
         "Sem 5": ["Reproductive Biology of Angiosperms", "Plant Physiology"],
         "Sem 6": ["Plant Metabolism", "Plant Biotechnology"],
+        "Sem 7": ["Molecular Biology", "Plant Ecology & Phytogeography", "Plant Systematics"],
+        "Sem 8": ["Molecular Biology", "Plant Ecology & Phytogeography", "Plant Systematics"],
     },
     "B.Sc (Hons) Zoology": {
         "Sem 1": ["Non-Chordates I", "Principles of Ecology"],
