@@ -10,12 +10,14 @@ import json
 import difflib
 import unicodedata
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import urllib.parse
 from collections import OrderedDict
 import libsql_experimental as sqlite3
 from fastapi import FastAPI, UploadFile, File, Form, Response, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
+from starlette.concurrency import run_in_threadpool
 
 app = FastAPI(title="DU PYQ Vault")
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -110,19 +112,139 @@ def cached(key, fn):
     return val
 
 
-def q_all(cursor, sql, params=()):
-    cursor.execute(sql, params)
-    return cursor.fetchall()
+# ───────────────────────── SNAPSHOT: the whole (small) catalogue lives in memory ─────────────────────────
+# Every database question costs a full network round trip (about half a second to a far-away Turso region).
+# So the app reads courses, subjects and the paper list (without the PDF files) ONCE, keeps them in memory,
+# and refreshes them in the background. Page views then need no database at all.
+SNAP = {"ready": False, "at": 0.0, "sig": None, "papers": [], "bg": None}
+_SNAP_LOCK = threading.Lock()
+SNAP_TTL = 45  # seconds between quiet background refreshes (admin changes refresh immediately)
 
 
-def ensure_loaded(cursor):
-    """Courses / subjects are re-read from the database only when something changed or after CACHE_TTL."""
-    global _DIRTY, _LOADED_AT
-    if _DIRTY or time.time() - _LOADED_AT > CACHE_TTL:
-        reload_courses(cursor)
-        reload_curriculum(cursor)
-        _DIRTY = False
-        _LOADED_AT = time.time()
+def _q(sql, params=()):
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(sql, params)
+        return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def apply_courses(rows):
+    COURSE_LIST[:] = [
+        {"key": k, "name": n, "label": l or n, "icon": i or "folder", "color": col or ""}
+        for k, n, l, i, col in rows
+    ]
+
+
+def apply_curriculum(rows):
+    fresh, style = {}, {}
+    for c, sm, n, ic, col in rows:
+        fresh.setdefault(c, {}).setdefault(sm, []).append(n)
+        if ic or col:
+            style[(c, n)] = (ic or "", col or "")
+    CURRICULUM.clear()
+    CURRICULUM.update(fresh)
+    SUBJECT_STYLE.clear()
+    SUBJECT_STYLE.update(style)
+
+
+def refresh_snapshot(block=False, force=False):
+    """Reads everything in parallel (4 queries at once = one round-trip of waiting)."""
+    if not _SNAP_LOCK.acquire(blocking=block):
+        return False  # someone else is already refreshing
+    try:
+        if not force and SNAP["ready"] and time.time() - SNAP["at"] < 5:
+            return True
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            futs = [
+                ex.submit(_q, "SELECT key, name, label, icon, color FROM du_courses ORDER BY position, id"),
+                ex.submit(_q, "SELECT course, semester, name, icon, color FROM du_subjects ORDER BY id"),
+                ex.submit(_q, "SELECT id, title, course, semester, year, type, url_or_name, file_size, subject FROM du_resources"),
+                ex.submit(_q, "SELECT version, opacity FROM du_background WHERE id = 1"),
+            ]
+            courses, subjects, papers, bg = [f.result() for f in futs]
+        sig = hash(repr((courses, subjects, papers, bg)))
+        changed = sig != SNAP["sig"]
+        if changed:
+            apply_courses(courses)
+            apply_curriculum(subjects)
+            SNAP["papers"] = [tuple(r) for r in papers]
+            SNAP["bg"] = tuple(bg[0]) if bg else None
+            SNAP["sig"] = sig
+        SNAP["at"] = time.time()
+        SNAP["ready"] = True
+        if changed:
+            with _LOCK:
+                _CACHE.clear()
+        return True
+    finally:
+        _SNAP_LOCK.release()
+
+
+def _bg_refresh():
+    try:
+        refresh_snapshot(block=False)
+    except Exception as exc:  # keep serving the last good copy if the database hiccups
+        print(f"snapshot refresh failed: {exc}", flush=True)
+
+
+def ensure_snapshot():
+    if not SNAP["ready"]:
+        refresh_snapshot(block=True)  # very first load only (a startup thread normally has done this already)
+    elif time.time() - SNAP["at"] > SNAP_TTL:
+        threading.Thread(target=_bg_refresh, daemon=True).start()  # serve the current copy, refresh quietly
+
+
+def snap_counts():
+    out = {}
+    for r in SNAP["papers"]:
+        out[r[2]] = out.get(r[2], 0) + 1
+    return out
+
+
+def snap_subcounts(course):
+    out = {}
+    for r in SNAP["papers"]:
+        if r[2] == course:
+            k = (r[8] or UNSORTED, r[3])
+            out[k] = out.get(k, 0) + 1
+    return [(sub, sm, n) for (sub, sm), n in out.items()]
+
+
+def snap_years(course, subject):
+    return {r[4] for r in SNAP["papers"] if r[2] == course and (r[8] or UNSORTED) == subject and r[4]}
+
+
+def snap_known_subjects():
+    return {r[8] for r in SNAP["papers"] if r[8]}
+
+
+def snap_records(course, subject, sem, year, q):
+    ql = (q or "").lower()
+    out = []
+    for r in SNAP["papers"]:
+        if course and r[2] != course:
+            continue
+        if subject and (r[8] or UNSORTED) != subject:
+            continue
+        if sem != "All Semesters" and not subject and r[3] != sem:
+            continue
+        if subject and year and year != "All Years" and (r[4] or "") != year:
+            continue
+        if ql and not any(ql in str(x or "").lower() for x in (r[1], r[2], r[4], r[8])):
+            continue
+        out.append(r)
+    out.sort(key=lambda r: ((r[4] or ""), r[0]), reverse=True)  # newest year first, then newest upload
+    return out
+
+
+def parse_mb(text) -> int:
+    try:
+        return int(float(str(text).split()[0]) * 1048576)
+    except Exception:
+        return 0
 
 
 def blob_get(key):
@@ -155,6 +277,10 @@ async def housekeeping(request: Request, call_next):
     response = await call_next(request)
     if write:
         cache_clear()
+        try:
+            await run_in_threadpool(refresh_snapshot, True, True)  # so the admin sees the change on the next page
+        except Exception as exc:
+            print(f"snapshot refresh after write failed: {exc}", flush=True)
     ms = (time.perf_counter() - start) * 1000
     response.headers["Server-Timing"] = f"app;dur={ms:.0f}"  # visible in the browser's Network tab
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -163,37 +289,6 @@ async def housekeeping(request: Request, call_next):
     if ms > 1500:
         print(f"SLOW {request.method} {request.url.path} {ms:.0f}ms", flush=True)  # shows up in Render logs
     return response
-
-
-class LazyDB:
-    """Opens the (remote) database only when a query is really needed, so fully cached pages never touch it."""
-
-    def __init__(self):
-        self._conn = None
-        self._cur = None
-
-    def cursor(self):
-        return self
-
-    def _c(self):
-        if self._cur is None:
-            self._conn = get_db()
-            self._cur = self._conn.cursor()
-        return self._cur
-
-    def execute(self, *a, **k):
-        self._c().execute(*a, **k)
-        return self
-
-    def fetchone(self):
-        return self._c().fetchone()
-
-    def fetchall(self):
-        return self._c().fetchall()
-
-    def close(self):
-        if self._conn is not None:
-            self._conn.close()
 
 
 def add_fresh(url: str) -> str:
@@ -816,6 +911,7 @@ def init_db():
 
 
 init_db()
+threading.Thread(target=_bg_refresh, daemon=True).start()
 
 # ───────────────────────── PWA ASSETS ─────────────────────────
 PWA_MANIFEST = """{
@@ -1811,6 +1907,7 @@ def crumbs_html(course: str, subject: str, q: str) -> str:
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, q: str = "", course: str = "", sem: str = "All Semesters", subject: str = "", notice: str = "", year: str = ""):
     admin = is_admin(request)
+    ensure_snapshot()  # keeps the in-memory catalogue fresh (quietly, in the background)
     if admin or notice:
         return HTMLResponse(content=render_index(admin, q, course, sem, subject, notice, year))
     # Visitors all get the same page, so it is built once and reused (cleared whenever the admin changes anything)
@@ -1820,16 +1917,14 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
 
 def render_index(admin: bool, q: str, course: str, sem: str, subject: str, notice: str, year: str) -> str:
     q = q.strip()
-    conn = LazyDB()
-    cursor = conn.cursor()
-    ensure_loaded(cursor)
+    ensure_snapshot()
     main_view_content = ""
     bg_layer = ""
     bg_modal = ""
 
     # ── LEVEL 1: Home → course folders
     if not course and not q and not subject:
-        counts = dict(cached(("counts",), lambda: q_all(cursor, "SELECT course, COUNT(*) FROM du_resources GROUP BY course")))
+        counts = snap_counts()
         folders_grid = '<div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 6px 0 12px;">Select Course Folder</div>'
         if COURSE_LIST:
             folders_grid += '<div class="subject-grid">' + "".join(
@@ -1858,8 +1953,7 @@ def render_index(admin: bool, q: str, course: str, sem: str, subject: str, notic
         home_tools = f'<div style="display:flex; gap:8px; flex-wrap:wrap; margin:4px 0 4px;">{tool_btns}</div>'
         main_view_content = search_bar + home_tools + folders_grid
         # Background image (main screen only)
-        bg_rows = cached(("bg",), lambda: q_all(cursor, "SELECT version, opacity FROM du_background WHERE id = 1"))
-        bg_row = bg_rows[0] if bg_rows else None
+        bg_row = SNAP["bg"]
         if bg_row:
             bg_ver = int(bg_row[0] or 1)
             bg_op = max(5, min(40, int(bg_row[1] if bg_row[1] is not None else 15)))
@@ -1902,11 +1996,7 @@ def render_index(admin: bool, q: str, course: str, sem: str, subject: str, notic
 
     # ── LEVEL 2: Course → subject folders (grouped by semester)
     elif course and not subject and not q:
-        rows = cached(("subcounts", course), lambda: q_all(
-            cursor,
-            "SELECT subject, semester, COUNT(*) FROM du_resources WHERE course = ? GROUP BY subject, semester",
-            (course,),
-        ))
+        rows = snap_subcounts(course)
         seeded = CURRICULUM.get(course, {})
         seeded_names = {n for names in seeded.values() for n in names}
         sub_counts, extra = {}, {}
@@ -1964,26 +2054,7 @@ def render_index(admin: bool, q: str, course: str, sem: str, subject: str, notic
 
     # ── LEVEL 3: PYQ list (subject folder, course search, or global search)
     else:
-        query = "SELECT id, title, course, semester, year, type, url_or_name, file_size, subject FROM du_resources WHERE 1=1"
-        params = []
-        if course:
-            query += " AND course = ?"
-            params.append(course)
-        if subject:
-            query += " AND subject = ?"
-            params.append(subject)
-        if sem != "All Semesters" and not subject:
-            query += " AND semester = ?"
-            params.append(sem)
-        if subject and year and year != "All Years":
-            query += " AND year = ?"
-            params.append(year)
-        if q:
-            query += " AND (LOWER(title) LIKE ? OR LOWER(course) LIKE ? OR LOWER(year) LIKE ? OR LOWER(subject) LIKE ?)"
-            wc = f"%{q.lower()}%"
-            params.extend([wc, wc, wc, wc])
-        query += " ORDER BY year DESC, id DESC"
-        records = cached(("list", query, tuple(params)), lambda: q_all(cursor, query, tuple(params)))
+        records = snap_records(course, subject, sem, year, q)
 
         tile = course_tile(course)
         if subject:
@@ -2004,9 +2075,7 @@ def render_index(admin: bool, q: str, course: str, sem: str, subject: str, notic
         """
         if subject:
             # Inside a subject the semester is already known, so filter by exam year instead
-            year_rows = cached(("years", course, subject), lambda: q_all(
-                cursor, "SELECT DISTINCT year FROM du_resources WHERE course = ? AND subject = ?", (course, subject)
-            ))
+            year_rows = [(y,) for y in snap_years(course, subject)]
             years = sorted(
                 {r[0] for r in year_rows if r[0]},
                 key=lambda v: (not v.isdigit(), -int(v) if v.isdigit() else 0, v),
@@ -2085,10 +2154,7 @@ def render_index(admin: bool, q: str, course: str, sem: str, subject: str, notic
         main_view_content = f'<div class="notice">{esc(notice[:200])}</div>' + main_view_content
 
     # Subject suggestions for the upload / edit forms
-    known = {r[0] for r in cached(("known",), lambda: q_all(
-        cursor, "SELECT DISTINCT subject FROM du_resources WHERE subject IS NOT NULL AND subject != ''"
-    ))}
-    conn.close()
+    known = snap_known_subjects()
     for sems in CURRICULUM.values():
         for names in sems.values():
             known.update(names)
@@ -2658,24 +2724,20 @@ def subject_delete(request: Request, course: str = Form(...), name: str = Form(.
 @app.get("/api/catalog")
 def api_catalog():
     """List of pages and papers, used by the 'Save for offline' button and the background warm-up."""
-    conn = LazyDB()
-    cursor = conn.cursor()
-    ensure_loaded(cursor)
+    ensure_snapshot()
 
     def build():
         pages = ["/"] + [f"/?course={urlq(c['name'])}" for c in COURSE_LIST]
-        for course, subj in q_all(cursor, "SELECT DISTINCT course, subject FROM du_resources"):
-            if course and subj:
-                pages.append(f"/?course={urlq(course)}&subject={urlq(subj)}")
-        papers = [
-            {"id": r[0], "title": r[1], "bytes": int(r[2] or 0)}
-            for r in q_all(cursor, "SELECT id, title, LENGTH(file_data) FROM du_resources WHERE type = 'pdf'")
-        ]
+        pairs, papers = set(), []
+        for r in SNAP["papers"]:
+            if r[2] and r[8]:
+                pairs.add((r[2], r[8]))
+            if r[5] == "pdf":
+                papers.append({"id": r[0], "title": r[1], "bytes": parse_mb(r[7])})
+        pages += [f"/?course={urlq(c)}&subject={urlq(sb)}" for c, sb in sorted(pairs)]
         return {"pages": pages, "papers": papers, "total_bytes": sum(x["bytes"] for x in papers)}
 
-    data = cached(("catalog",), build)
-    conn.close()
-    return JSONResponse(data, headers={"Cache-Control": "no-store"})
+    return JSONResponse(cached(("catalog",), build), headers={"Cache-Control": "no-store"})
 
 
 @app.get("/diag", response_class=HTMLResponse)
@@ -2707,14 +2769,15 @@ def diag(request: Request):
     elif avg < 120:
         verdict = "Database speed is acceptable. Moving Render and Turso to the same region could still help."
     else:
-        verdict = "Database is far from the app (slow round trips). Put the Render service and the Turso database in the same region, e.g. both in Singapore."
+        verdict = "Database is far from the app (each question takes a long round trip). Pages are now served from memory so visitors are no longer slowed by this, but admin actions and the first opening of a PDF still are. Put the Render service and the Turso database in the same region to fix that too."
     rows = [
         ("Database", "Turso (remote)" if remote else "Local file"),
         ("Time to open a database connection", f"{connect_ms:.0f} ms"),
         ("Average time of one query (5 tests)", f"{avg:.0f} ms (fastest {min(samples):.0f}, slowest {max(samples):.0f})"),
         ("Heavy query (count + total PDF size)", f"{count_ms:.0f} ms"),
         ("Papers stored / total PDF size", f"{n} / {int(total) / 1048576:.1f} MB"),
-        ("Pages & lists kept in memory", f"{len(_CACHE)} items"),
+        ("Catalogue kept in memory", f"{len(SNAP['papers'])} papers, last refreshed {int(time.time() - SNAP['at'])} s ago"),
+        ("Pages kept in memory", f"{len(_CACHE)} items"),
         ("PDFs kept in memory", f"{len(_BLOBS)} files, {_BLOB_BYTES / 1048576:.1f} MB"),
     ]
     table = "".join(f"<tr><td>{esc(k)}</td><td><b>{esc(v)}</b></td></tr>" for k, v in rows)
