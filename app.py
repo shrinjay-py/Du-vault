@@ -9,10 +9,12 @@ import hashlib
 import json
 import difflib
 import unicodedata
+import threading
 import urllib.parse
+from collections import OrderedDict
 import libsql_experimental as sqlite3
 from fastapi import FastAPI, UploadFile, File, Form, Response, Request
-from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 
 app = FastAPI(title="DU PYQ Vault")
@@ -73,6 +75,129 @@ def back_url(request: Request) -> str:
         if p.netloc == request.headers.get("host", ""):
             return (p.path or "/") + (f"?{p.query}" if p.query else "")
     return "/"
+
+
+# ───────────────────────── SPEED: IN-MEMORY CACHES ─────────────────────────
+MAX_PDF_BYTES = 25 * 1024 * 1024  # one PDF; protects the server's memory and the database
+CACHE_TTL = 120  # seconds; every admin change (any POST) also clears the cache immediately
+_CACHE = {}
+_DIRTY = True
+_LOADED_AT = 0.0
+_LOCK = threading.Lock()
+_BLOBS = OrderedDict()  # recently opened PDFs / background image, kept in RAM
+_BLOB_BYTES = 0
+BLOB_CACHE_LIMIT = 48 * 1024 * 1024
+
+
+def cache_clear():
+    global _DIRTY, _BLOB_BYTES
+    with _LOCK:
+        _CACHE.clear()
+        _BLOBS.clear()
+        _BLOB_BYTES = 0
+        _DIRTY = True
+
+
+def cached(key, fn):
+    hit = _CACHE.get(key)
+    if hit and time.time() - hit[0] < CACHE_TTL:
+        return hit[1]
+    val = fn()
+    with _LOCK:
+        if len(_CACHE) > 400:
+            _CACHE.clear()
+        _CACHE[key] = (time.time(), val)
+    return val
+
+
+def q_all(cursor, sql, params=()):
+    cursor.execute(sql, params)
+    return cursor.fetchall()
+
+
+def ensure_loaded(cursor):
+    """Courses / subjects are re-read from the database only when something changed or after CACHE_TTL."""
+    global _DIRTY, _LOADED_AT
+    if _DIRTY or time.time() - _LOADED_AT > CACHE_TTL:
+        reload_courses(cursor)
+        reload_curriculum(cursor)
+        _DIRTY = False
+        _LOADED_AT = time.time()
+
+
+def blob_get(key):
+    with _LOCK:
+        item = _BLOBS.get(key)
+        if item is not None:
+            _BLOBS.move_to_end(key)
+        return item[0] if item else None
+
+
+def blob_put(key, value, size):
+    global _BLOB_BYTES
+    if size > BLOB_CACHE_LIMIT // 2:
+        return
+    with _LOCK:
+        _BLOBS[key] = (value, size)
+        _BLOB_BYTES += size
+        while _BLOB_BYTES > BLOB_CACHE_LIMIT and _BLOBS:
+            _, (_, sz) = _BLOBS.popitem(last=False)
+            _BLOB_BYTES -= sz
+
+
+@app.middleware("http")
+async def housekeeping(request: Request, call_next):
+    start = time.perf_counter()
+    # Only a logged-in admin's changes clear the caches (visitors can't force constant cache misses)
+    write = request.method == "POST" and is_admin(request)
+    if write:
+        cache_clear()
+    response = await call_next(request)
+    if write:
+        cache_clear()
+    ms = (time.perf_counter() - start) * 1000
+    response.headers["Server-Timing"] = f"app;dur={ms:.0f}"  # visible in the browser's Network tab
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    if ms > 1500:
+        print(f"SLOW {request.method} {request.url.path} {ms:.0f}ms", flush=True)  # shows up in Render logs
+    return response
+
+
+class LazyDB:
+    """Opens the (remote) database only when a query is really needed, so fully cached pages never touch it."""
+
+    def __init__(self):
+        self._conn = None
+        self._cur = None
+
+    def cursor(self):
+        return self
+
+    def _c(self):
+        if self._cur is None:
+            self._conn = get_db()
+            self._cur = self._conn.cursor()
+        return self._cur
+
+    def execute(self, *a, **k):
+        self._c().execute(*a, **k)
+        return self
+
+    def fetchone(self):
+        return self._c().fetchone()
+
+    def fetchall(self):
+        return self._c().fetchall()
+
+    def close(self):
+        if self._conn is not None:
+            self._conn.close()
+
+
+def add_fresh(url: str) -> str:
+    return url + ("&" if "?" in url else "?") + "fresh=1"
 
 
 def get_db():
@@ -726,7 +851,7 @@ PWA_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" 
   <text x="256" y="365" font-family="sans-serif" font-size="34" letter-spacing="4" font-weight="bold" fill="#1E1A17" text-anchor="middle">VAULT</text>
 </svg>"""
 
-SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v19';
+SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v21';
 const PRECACHE = [
   '/',
   '/manifest.json',
@@ -735,48 +860,69 @@ const PRECACHE = [
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
 ];
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(PRECACHE)));
+  // One failed file must not break the whole install
+  e.waitUntil(caches.open(CACHE_NAME).then((c) => Promise.all(PRECACHE.map((u) => c.add(u).catch(() => {})))));
   self.skipWaiting();
 });
 self.addEventListener('activate', (e) => {
+  // 'du-vault-keep-*' hold the pages and papers the visitor chose to save; never delete those
   e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : null)))
+      Promise.all(keys.map((k) => (k !== CACHE_NAME && !k.startsWith('du-vault-keep-') ? caches.delete(k) : null)))
     )
   );
   self.clients.claim();
 });
+async function handleNavigation(req, url) {
+  const cache = await caches.open(CACHE_NAME);
+  const network = fetch(req).then((res) => {
+    if (res && res.ok) cache.put(req, res.clone());
+    return res;
+  });
+  // Right after an admin action (login, upload, edit...) never show a saved copy
+  if (url.searchParams.has('fresh') || url.searchParams.has('notice')) {
+    return network.catch(async () => (await caches.match(req)) || (await caches.match('/')) || Response.error());
+  }
+  const saved = await caches.match(req);
+  if (!saved) {
+    return network.catch(async () => (await caches.match('/')) || Response.error());
+  }
+  // Wait up to 3 seconds for the server, then show the saved page instantly
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 3000));
+  try {
+    return (await Promise.race([network, timeout])) || saved;
+  } catch (err) {
+    return saved;
+  }
+}
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
-  // Pages: network first (so login/logout and new uploads show instantly), cache as offline fallback
-  if (e.request.mode === 'navigate') {
-    e.respondWith(
-      fetch(e.request).then((res) => {
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((c) => c.put(e.request, copy));
-        }
-        return res;
-      }).catch(() => caches.match(e.request).then((r) => r || caches.match('/')))
-    );
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  // Let these go straight to the server: PDF downloads/ranges, the catalog, the speed check, and warm-up refreshes
+  if (req.headers.has('range') || req.headers.has('x-warm') ||
+      url.pathname.startsWith('/view/') || url.pathname.startsWith('/api/') || url.pathname === '/diag') return;
+  if (req.mode === 'navigate') {
+    e.respondWith(handleNavigation(req, url));
     return;
   }
-  // Everything else: serve cache instantly, refresh in background
+  // Everything else: serve the saved copy instantly, refresh it in the background
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
+    caches.match(req).then((cachedResponse) => {
       if (cachedResponse) {
-        fetch(e.request).then((networkResponse) => {
+        fetch(req).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, networkResponse));
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, networkResponse));
           }
         }).catch(() => {});
         return cachedResponse;
       }
-      return fetch(e.request).then((networkResponse) => {
-        return caches.open(CACHE_NAME).then((cache) => {
-          cache.put(e.request, networkResponse.clone());
-          return networkResponse;
-        });
+      return fetch(req).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+        }
+        return networkResponse;
       });
     })
   );
@@ -817,8 +963,10 @@ HTML_TEMPLATE = """
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
 <link rel="apple-touch-icon" href="/icon.svg">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 <style>
 :root {
     --espresso: #1E1A17;
@@ -1002,7 +1150,7 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
 .zoom-level-text { color: #D8C7B6; font-size: 0.78rem; font-weight: 600; padding: 6px 8px; display: flex; align-items: center; min-width: 48px; justify-content: center; }
 .pdf-close-btn { background: var(--caramel); color: #FAF6F2; border: none; padding: 7px 15px; border-radius: 12px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
 #pdf-scroll-container { flex: 1; overflow: auto; background: #1E1A17; display: flex; flex-direction: column; align-items: center; padding: 20px 10px 50px 10px; -webkit-overflow-scrolling: touch; user-select: none; -webkit-user-select: none; }
-.pdf-canvas-wrap { margin: 0 auto 16px auto; box-shadow: 0 4px 20px rgba(0,0,0,0.6); border-radius: 4px; background: #FFFFFF; line-height: 0; }
+.pdf-canvas-wrap { flex: 0 0 auto; margin: 0 auto 16px auto; box-shadow: 0 4px 20px rgba(0,0,0,0.6); border-radius: 4px; background: #FFFFFF; line-height: 0; }
 .pdf-page-canvas { display: block; border-radius: 4px; pointer-events: none; }
 .pdf-spinner { width: 44px; height: 44px; border: 3px solid rgba(167, 122, 83, 0.25); border-top: 3px solid var(--caramel); border-radius: 50%; animation: spinRing 0.9s linear infinite; margin-bottom: 14px; }
 @media (max-width: 480px) {
@@ -1159,6 +1307,19 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
         </form>
     </div>
 </div>
+<div class="modal" id="offlineModal" onclick="if(event.target === this) { offlineAbort = true; closeModal('offlineModal'); }">
+    <div class="modal-content">
+        <div class="modal-title">Save for offline &amp; faster use</div>
+        <div id="offStatus" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">Checking...</div>
+        <div style="height:10px; background:var(--bg-latte); border-radius:6px; overflow:hidden; margin-bottom:14px;">
+            <div id="offBar" style="height:100%; width:0; background:var(--caramel); transition:width 0.2s;"></div>
+        </div>
+        <button type="button" class="btn-pill" onclick="downloadOffline(false)">Download pages only (small)</button>
+        <button type="button" class="btn-pill btn-caramel" id="offAll" style="margin-top:10px;" onclick="downloadOffline(true)">Download pages + all papers</button>
+        <button type="button" class="btn-pill" style="margin-top:10px; background:#BA1A1A;" onclick="clearOffline()">Remove saved data</button>
+        <div class="helper-text" style="margin-top:10px;">Saved on this device only. Saved papers open instantly and work without internet. Run it again any time to fetch new papers.</div>
+    </div>
+</div>
 <div class="modal" id="courseAddModal" onclick="if(event.target === this) closeModal('courseAddModal')">
     <div class="modal-content">
         <div class="modal-title">Add Course</div>
@@ -1202,9 +1363,27 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
     </div>
 </div>
 <script>
-    if (window.pdfjsLib) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    // The PDF viewer library is loaded only when needed (and quietly in the background on paper lists)
+    let pdfJsPromise = null;
+    function loadPdfJs() {
+        if (window.pdfjsLib) return Promise.resolve();
+        if (!pdfJsPromise) {
+            pdfJsPromise = new Promise((resolve, reject) => {
+                const sc = document.createElement('script');
+                sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                sc.onload = () => {
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                    resolve();
+                };
+                sc.onerror = () => { pdfJsPromise = null; reject(new Error('pdf.js failed to load')); };
+                document.head.appendChild(sc);
+            });
+        }
+        return pdfJsPromise;
     }
+    window.addEventListener('load', () => {
+        if (document.querySelector('.card-item')) { setTimeout(() => loadPdfJs().catch(() => {}), 1500); }
+    });
     function openModal(id) { document.getElementById(id).classList.add('active'); }
     function closeModal(id) { document.getElementById(id).classList.remove('active'); }
     function showLoader() {
@@ -1215,7 +1394,105 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
         const loader = document.getElementById('loading-screen');
         if (loader) loader.classList.add('fade-out');
     }
-    window.addEventListener('load', () => { setTimeout(hideLoader, 200); });
+    // ── Offline pack & background warm-up ──
+    const KEEP_PAGES = 'du-vault-keep-pages';
+    const KEEP_PDFS = 'du-vault-keep-pdfs';
+    let offlineAbort = false;
+    let catalogData = null;
+    const fmtMB = (b) => (b / 1048576).toFixed(b > 10485760 ? 0 : 1) + ' MB';
+    async function loadCatalog() {
+        if (!catalogData) { catalogData = await (await fetch('/api/catalog')).json(); }
+        return catalogData;
+    }
+    function setOff(text, pct) {
+        document.getElementById('offStatus').textContent = text;
+        document.getElementById('offBar').style.width = Math.max(0, Math.min(100, pct)) + '%';
+    }
+    async function openOffline() {
+        openModal('offlineModal');
+        setOff('Checking what is available...', 0);
+        try {
+            const cat = await loadCatalog();
+            const have = (await (await caches.open(KEEP_PDFS)).keys()).length;
+            let space = '';
+            if (navigator.storage && navigator.storage.estimate) {
+                const e = await navigator.storage.estimate();
+                space = ' Free space on this device: about ' + fmtMB(Math.max(0, e.quota - e.usage)) + '.';
+            }
+            document.getElementById('offAll').textContent = 'Download pages + all papers (' + fmtMB(cat.total_bytes) + ')';
+            setOff(cat.papers.length + ' papers available (' + fmtMB(cat.total_bytes) + '). ' + have + ' already saved on this device.' + space, 0);
+        } catch (err) {
+            setOff('Could not reach the server. Please try again in a moment.', 0);
+        }
+    }
+    async function savePages(cat, onStep) {
+        const cache = await caches.open(KEEP_PAGES);
+        for (const url of cat.pages) {
+            if (offlineAbort) return;
+            try {
+                const r = await fetch(url, { credentials: 'same-origin', headers: { 'X-Warm': '1' } });
+                if (r.ok) await cache.put(url, r);
+            } catch (err) { if (err && err.name === 'QuotaExceededError') throw err; }
+            onStep();
+        }
+    }
+    async function downloadOffline(withPdfs) {
+        offlineAbort = false;
+        try {
+            const cat = await loadCatalog();
+            if (navigator.storage && navigator.storage.persist) { navigator.storage.persist(); }
+            const total = cat.pages.length + (withPdfs ? cat.papers.length : 0);
+            let done = 0, bytes = 0;
+            await savePages(cat, () => { done++; setOff('Saving pages... ' + done + '/' + total, (done / total) * 100); });
+            if (withPdfs) {
+                const pdfs = await caches.open(KEEP_PDFS);
+                const queue = cat.papers.slice();
+                const worker = async () => {
+                    while (queue.length && !offlineAbort) {
+                        const p = queue.shift();
+                        const key = '/view/' + p.id;
+                        try {
+                            if (!(await pdfs.match(key))) {
+                                const r = await fetch(key);
+                                if (r.ok) { await pdfs.put(key, r); bytes += p.bytes; }
+                            }
+                        } catch (err) { if (err && err.name === 'QuotaExceededError') { offlineAbort = true; throw err; } }
+                        done++;
+                        setOff('Saving papers... ' + done + '/' + total + ' (' + fmtMB(bytes) + ')', (done / total) * 100);
+                    }
+                };
+                await Promise.all([worker(), worker(), worker()]);
+            }
+            setOff(offlineAbort ? 'Stopped.' : 'Done! Everything saved now loads instantly on this device.', offlineAbort ? 0 : 100);
+        } catch (err) {
+            setOff(err && err.name === 'QuotaExceededError' ? 'This device ran out of storage. Free some space and try again.' : 'Something went wrong. Please try again.', 0);
+        }
+    }
+    async function clearOffline() {
+        await caches.delete(KEEP_PAGES);
+        await caches.delete(KEEP_PDFS);
+        localStorage.removeItem('du_warm');
+        setOff('Saved data removed from this device.', 0);
+    }
+    // Quietly refresh the saved pages (not the papers) at most once a day, only on a decent connection
+    async function warmPages() {
+        try {
+            const c = navigator.connection;
+            if (c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || ''))) return;
+            if (Date.now() - Number(localStorage.getItem('du_warm') || 0) < 24 * 3600 * 1000) return;
+            const cat = await loadCatalog();
+            const cache = await caches.open(KEEP_PAGES);
+            for (const url of cat.pages) {
+                const r = await fetch(url, { credentials: 'same-origin', headers: { 'X-Warm': '1' } });
+                if (r.ok) await cache.put(url, r);
+                await new Promise((res) => setTimeout(res, 200));
+            }
+            localStorage.setItem('du_warm', String(Date.now()));
+        } catch (err) {}
+    }
+    window.addEventListener('load', () => { setTimeout(warmPages, 5000); });
+    document.addEventListener('DOMContentLoaded', () => { setTimeout(hideLoader, 60); });
+    window.addEventListener('load', hideLoader);
 
     // Fix bfcache restoration lag when using right swipe or browser back button
     window.addEventListener('pageshow', (event) => {
@@ -1246,7 +1523,13 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
         document.getElementById('pdfViewerModal').classList.add('active');
         history.pushState({ pdfOpen: true }, '');
         try {
-            const loadingTask = pdfjsLib.getDocument(url);
+            await loadPdfJs();
+            let source = { url: url, disableAutoFetch: true, rangeChunkSize: 131072 };
+            try {
+                const saved = await caches.match(url);  // saved on this device? then open instantly, no download
+                if (saved) { source = { data: new Uint8Array(await saved.arrayBuffer()) }; }
+            } catch (err) {}
+            const loadingTask = pdfjsLib.getDocument(source);
             activePdfDoc = await loadingTask.promise;
             await renderPdfPages();
         } catch (err) {
@@ -1258,31 +1541,52 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
             `;
         }
     }
+    let pdfObserver = null;
+    let renderToken = 0;
     async function renderPdfPages() {
         if (!activePdfDoc) return;
+        const token = ++renderToken;
+        if (pdfObserver) { pdfObserver.disconnect(); pdfObserver = null; }
         const container = document.getElementById('pdf-scroll-container');
         container.innerHTML = '';
-        const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const availableWidth = Math.min(window.innerWidth - 32, 950);
-        for (let pageNum = 1; pageNum <= activePdfDoc.numPages; pageNum++) {
-            const page = await activePdfDoc.getPage(pageNum);
-            const unscaledViewport = page.getViewport({ scale: 1.0 });
-            const baseScale = availableWidth / unscaledViewport.width;
-            const finalScale = baseScale * currentZoomMultiplier;
-            const cssViewport = page.getViewport({ scale: finalScale });
-            const highResViewport = page.getViewport({ scale: finalScale * dpr });
-            const wrap = document.createElement('div');
-            wrap.className = 'pdf-canvas-wrap';
+        const cssScaleFor = (page) => (availableWidth / page.getViewport({ scale: 1.0 }).width) * currentZoomMultiplier;
+        // Size placeholders from page 1 so the scrollbar is right immediately; real pages are drawn only when they come into view
+        const first = await activePdfDoc.getPage(1);
+        if (token !== renderToken) return;
+        const v1 = first.getViewport({ scale: cssScaleFor(first) });
+        async function drawPage(wrap) {
+            if (token !== renderToken || !activePdfDoc) return;
+            const page = await activePdfDoc.getPage(Number(wrap.dataset.page));
+            if (token !== renderToken) return;
+            const scale = cssScaleFor(page);
+            const cssViewport = page.getViewport({ scale: scale });
+            const highRes = page.getViewport({ scale: scale * dpr });
             const canvas = document.createElement('canvas');
             canvas.className = 'pdf-page-canvas';
-            const context = canvas.getContext('2d');
-            canvas.width = Math.floor(highResViewport.width);
-            canvas.height = Math.floor(highResViewport.height);
+            canvas.width = Math.floor(highRes.width);
+            canvas.height = Math.floor(highRes.height);
             canvas.style.width = Math.floor(cssViewport.width) + 'px';
             canvas.style.height = Math.floor(cssViewport.height) + 'px';
+            wrap.style.width = canvas.style.width;
+            wrap.style.height = canvas.style.height;
             wrap.appendChild(canvas);
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport: highRes }).promise;
+        }
+        pdfObserver = new IntersectionObserver((entries) => {
+            entries.forEach((en) => {
+                if (en.isIntersecting) { pdfObserver.unobserve(en.target); drawPage(en.target).catch(() => {}); }
+            });
+        }, { root: container, rootMargin: '700px 0px' });
+        for (let n = 1; n <= activePdfDoc.numPages; n++) {
+            const wrap = document.createElement('div');
+            wrap.className = 'pdf-canvas-wrap';
+            wrap.dataset.page = n;
+            wrap.style.width = Math.floor(v1.width) + 'px';
+            wrap.style.height = Math.floor(v1.height) + 'px';
             container.appendChild(wrap);
-            await page.render({ canvasContext: context, viewport: highResViewport }).promise;
+            pdfObserver.observe(wrap);
         }
     }
     function updateZoomDisplay() {
@@ -1308,6 +1612,8 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
             viewer.classList.remove('active');
             document.getElementById('pdf-scroll-container').innerHTML = '';
             activePdfDoc = null;
+            renderToken++;
+            if (pdfObserver) { pdfObserver.disconnect(); pdfObserver = null; }
             if (!isPopState && history.state && history.state.pdfOpen) { history.back(); }
         }
     }
@@ -1505,19 +1811,25 @@ def crumbs_html(course: str, subject: str, q: str) -> str:
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, q: str = "", course: str = "", sem: str = "All Semesters", subject: str = "", notice: str = "", year: str = ""):
     admin = is_admin(request)
+    if admin or notice:
+        return HTMLResponse(content=render_index(admin, q, course, sem, subject, notice, year))
+    # Visitors all get the same page, so it is built once and reused (cleared whenever the admin changes anything)
+    page = cached(("html", q, course, sem, subject, year), lambda: render_index(False, q, course, sem, subject, "", year))
+    return HTMLResponse(content=page)
+
+
+def render_index(admin: bool, q: str, course: str, sem: str, subject: str, notice: str, year: str) -> str:
     q = q.strip()
-    conn = get_db()
+    conn = LazyDB()
     cursor = conn.cursor()
-    reload_curriculum(cursor)
-    reload_courses(cursor)
+    ensure_loaded(cursor)
     main_view_content = ""
     bg_layer = ""
     bg_modal = ""
 
     # ── LEVEL 1: Home → course folders
     if not course and not q and not subject:
-        cursor.execute("SELECT course, COUNT(*) FROM du_resources GROUP BY course")
-        counts = dict(cursor.fetchall())
+        counts = dict(cached(("counts",), lambda: q_all(cursor, "SELECT course, COUNT(*) FROM du_resources GROUP BY course")))
         folders_grid = '<div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 6px 0 12px;">Select Course Folder</div>'
         if COURSE_LIST:
             folders_grid += '<div class="subject-grid">' + "".join(
@@ -1532,19 +1844,22 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
             </div>
         </form>
         """
-        home_tools = ""
+        tool_btns = (
+            '<button type="button" class="back-folder-btn" style="border:none;cursor:pointer;background:var(--caramel);" '
+            'onclick="openOffline()">⬇ Save for offline</button>'
+        )
         if admin:
-            home_tools = (
-                '<div style="display:flex; gap:8px; flex-wrap:wrap; margin:4px 0 4px;">'
-                '<button type="button" class="back-folder-btn" style="border:none;cursor:pointer;background:var(--caramel);" '
+            tool_btns += (
+                '<button type="button" class="back-folder-btn" style="border:none;cursor:pointer;" '
                 'onclick="openAddCourse()">➕ Add Course</button>'
                 '<button type="button" class="back-folder-btn" style="border:none;cursor:pointer;" '
-                'onclick="openModal(\'bgModal\')">🖼 Background</button></div>'
+                'onclick="openModal(\'bgModal\')">🖼 Background</button>'
             )
+        home_tools = f'<div style="display:flex; gap:8px; flex-wrap:wrap; margin:4px 0 4px;">{tool_btns}</div>'
         main_view_content = search_bar + home_tools + folders_grid
         # Background image (main screen only)
-        cursor.execute("SELECT version, opacity FROM du_background WHERE id = 1")
-        bg_row = cursor.fetchone()
+        bg_rows = cached(("bg",), lambda: q_all(cursor, "SELECT version, opacity FROM du_background WHERE id = 1"))
+        bg_row = bg_rows[0] if bg_rows else None
         if bg_row:
             bg_ver = int(bg_row[0] or 1)
             bg_op = max(5, min(40, int(bg_row[1] if bg_row[1] is not None else 15)))
@@ -1587,11 +1902,11 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
 
     # ── LEVEL 2: Course → subject folders (grouped by semester)
     elif course and not subject and not q:
-        cursor.execute(
+        rows = cached(("subcounts", course), lambda: q_all(
+            cursor,
             "SELECT subject, semester, COUNT(*) FROM du_resources WHERE course = ? GROUP BY subject, semester",
             (course,),
-        )
-        rows = cursor.fetchall()
+        ))
         seeded = CURRICULUM.get(course, {})
         seeded_names = {n for names in seeded.values() for n in names}
         sub_counts, extra = {}, {}
@@ -1668,8 +1983,7 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
             wc = f"%{q.lower()}%"
             params.extend([wc, wc, wc, wc])
         query += " ORDER BY year DESC, id DESC"
-        cursor.execute(query, tuple(params))
-        records = cursor.fetchall()
+        records = cached(("list", query, tuple(params)), lambda: q_all(cursor, query, tuple(params)))
 
         tile = course_tile(course)
         if subject:
@@ -1690,9 +2004,11 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
         """
         if subject:
             # Inside a subject the semester is already known, so filter by exam year instead
-            cursor.execute("SELECT DISTINCT year FROM du_resources WHERE course = ? AND subject = ?", (course, subject))
+            year_rows = cached(("years", course, subject), lambda: q_all(
+                cursor, "SELECT DISTINCT year FROM du_resources WHERE course = ? AND subject = ?", (course, subject)
+            ))
             years = sorted(
-                {r[0] for r in cursor.fetchall() if r[0]},
+                {r[0] for r in year_rows if r[0]},
                 key=lambda v: (not v.isdigit(), -int(v) if v.isdigit() else 0, v),
             )
             year_options = '<option value="All Years">All Years</option>' + "".join(
@@ -1769,8 +2085,9 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
         main_view_content = f'<div class="notice">{esc(notice[:200])}</div>' + main_view_content
 
     # Subject suggestions for the upload / edit forms
-    cursor.execute("SELECT DISTINCT subject FROM du_resources WHERE subject IS NOT NULL AND subject != ''")
-    known = {r[0] for r in cursor.fetchall()}
+    known = {r[0] for r in cached(("known",), lambda: q_all(
+        cursor, "SELECT DISTINCT subject FROM du_resources WHERE subject IS NOT NULL AND subject != ''"
+    ))}
     conn.close()
     for sems in CURRICULUM.values():
         for names in sems.values():
@@ -1782,7 +2099,7 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
     up_sem_opts = "".join(f'<option value="{esc(s)}">{esc(s)}</option>' for s in SEMESTERS[1:])
     if admin:
         admin_header_btn = '<a href="/logout" class="admin-lock-btn">Logout</a>'
-        admin_banner_html = '<div class="admin-banner"><span>⚡ Host Controls Unlocked</span><a href="/logout">Lock</a></div>'
+        admin_banner_html = '<div class="admin-banner"><span>⚡ Host Controls Unlocked</span><span><a href="/diag">Speed check</a> &nbsp;&nbsp; <a href="/logout">Lock</a></span></div>'
         fab_controls = """
         <div class="fab-bar">
             <button class="fab" onclick="openModal('uploadModal')">📤 Batch Upload</button>
@@ -1806,14 +2123,28 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
     content = content.replace("{admin_banner_html}", admin_banner_html)
     content = content.replace("{fab_controls}", fab_controls)
     content = content.replace("{main_view_content}", main_view_content)
-    return HTMLResponse(content=content)
+    return content
 
 
 # ───────────────────────── AUTH ROUTES ─────────────────────────
+_LOGIN_FAILS = {}
+
+
+def client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    return (fwd.split(",")[0].strip() if fwd else "") or (request.client.host if request.client else "?")
+
+
 @app.post("/login")
-def login(password: str = Form(...)):
+def login(request: Request, password: str = Form(...)):
+    ip = client_ip(request)
+    recent = [t for t in _LOGIN_FAILS.get(ip, []) if time.time() - t < 600]
+    _LOGIN_FAILS[ip] = recent
+    if len(recent) >= 6:
+        return HTMLResponse("Too many wrong attempts. Please wait 10 minutes and try again.", status_code=429)
     if hmac.compare_digest(password.encode(), ADMIN_PASSWORD.encode()):
-        response = RedirectResponse(url="/", status_code=303)
+        _LOGIN_FAILS.pop(ip, None)
+        response = RedirectResponse(url="/?fresh=1", status_code=303)
         response.set_cookie(
             key="du_admin_session",
             value=make_session_token(),
@@ -1823,12 +2154,13 @@ def login(password: str = Form(...)):
             max_age=SESSION_TTL,
         )
         return response
+    _LOGIN_FAILS[ip].append(time.time())
     return HTMLResponse("Invalid Password", status_code=401)
 
 
 @app.get("/logout")
 def logout():
-    response = RedirectResponse(url="/", status_code=303)
+    response = RedirectResponse(url="/?fresh=1", status_code=303)
     response.delete_cookie(key="du_admin_session")
     return response
 
@@ -1840,6 +2172,8 @@ def folder_redirect(course: str, subject: str = "", notice: str = "") -> Redirec
         url += f"&subject={urlq(subject)}"
     if notice:
         url += f"&notice={urlq(notice)}"
+    else:
+        url += "&fresh=1"
     return RedirectResponse(url=url, status_code=303)
 
 
@@ -1861,9 +2195,13 @@ async def upload_files(
     conn = get_db()
     cursor = conn.cursor()
     last_course, last_subject = None, ""
+    skipped = []
     for file in files:
         if file.filename and file.filename.lower().endswith(".pdf"):
             data = await file.read()
+            if len(data) > MAX_PDF_BYTES:
+                skipped.append(file.filename)
+                continue
             size_mb = f"{len(data) / (1024 * 1024):.2f} MB"
             clean_title, detected_course, detected_sem, detected_year = parse_filename(file.filename, course, sem, year)
             detected_subject = resolve_subject(detected_course, detected_sem, subject, file.filename)
@@ -1878,10 +2216,11 @@ async def upload_files(
             )
     conn.commit()
     conn.close()
+    skip_note = (f"Skipped (over {MAX_PDF_BYTES // 1048576} MB): " + ", ".join(skipped))[:180] if skipped else ""
     if not last_course:
-        return RedirectResponse(url="/", status_code=303)
+        return RedirectResponse(url="/?" + (f"notice={urlq(skip_note)}" if skip_note else "fresh=1"), status_code=303)
     # Single subject in the batch → open that subject; otherwise open the course
-    return folder_redirect(last_course, last_subject if subject.strip() else "")
+    return folder_redirect(last_course, last_subject if subject.strip() else "", notice=skip_note)
 
 
 @app.post("/edit-item")
@@ -2134,17 +2473,21 @@ def prepare_background(data: bytes):
 
 
 @app.get("/bg")
-def get_background():
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT data, mime FROM du_background WHERE id = 1")
-    row = cursor.fetchone()
-    conn.close()
-    if not row or not row[0]:
-        return HTMLResponse("No background", status_code=404)
+def get_background(v: int = 0):
+    item = blob_get(("bg", v))
+    if item is None:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT data, mime FROM du_background WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+        if not row or not row[0]:
+            return HTMLResponse("No background", status_code=404)
+        item = (row[1] or "image/jpeg", bytes(row[0]))
+        blob_put(("bg", v), item, len(item[1]))
     return Response(
-        content=bytes(row[0]),
-        media_type=row[1] or "image/jpeg",
+        content=item[1],
+        media_type=item[0],
         headers={"Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"},
     )
 
@@ -2312,25 +2655,141 @@ def subject_delete(request: Request, course: str = Form(...), name: str = Form(.
     return folder_redirect(course)
 
 
-@app.get("/view/{item_id}")
-def view_pdf(item_id: int):
+@app.get("/api/catalog")
+def api_catalog():
+    """List of pages and papers, used by the 'Save for offline' button and the background warm-up."""
+    conn = LazyDB()
+    cursor = conn.cursor()
+    ensure_loaded(cursor)
+
+    def build():
+        pages = ["/"] + [f"/?course={urlq(c['name'])}" for c in COURSE_LIST]
+        for course, subj in q_all(cursor, "SELECT DISTINCT course, subject FROM du_resources"):
+            if course and subj:
+                pages.append(f"/?course={urlq(course)}&subject={urlq(subj)}")
+        papers = [
+            {"id": r[0], "title": r[1], "bytes": int(r[2] or 0)}
+            for r in q_all(cursor, "SELECT id, title, LENGTH(file_data) FROM du_resources WHERE type = 'pdf'")
+        ]
+        return {"pages": pages, "papers": papers, "total_bytes": sum(x["bytes"] for x in papers)}
+
+    data = cached(("catalog",), build)
+    conn.close()
+    return JSONResponse(data, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/diag", response_class=HTMLResponse)
+def diag(request: Request):
+    """Admin-only speed check: shows where the time really goes (database distance vs. everything else)."""
+    if not is_admin(request):
+        return HTMLResponse("Unauthorized.", status_code=403)
+    t = time.perf_counter()
+    conn = get_db()
+    connect_ms = (time.perf_counter() - t) * 1000
+    cursor = conn.cursor()
+    samples = []
+    for _ in range(5):
+        t = time.perf_counter()
+        cursor.execute("SELECT 1")
+        cursor.fetchall()
+        samples.append((time.perf_counter() - t) * 1000)
+    t = time.perf_counter()
+    cursor.execute("SELECT COUNT(*), COALESCE(SUM(LENGTH(file_data)), 0) FROM du_resources")
+    n, total = cursor.fetchone()
+    count_ms = (time.perf_counter() - t) * 1000
+    conn.close()
+    avg = sum(samples) / len(samples)
+    remote = bool(TURSO_DB_URL and TURSO_AUTH_TOKEN)
+    if not remote:
+        verdict = "Using a local database file (no Turso variables set). Papers saved this way are lost whenever Render redeploys."
+    elif avg < 40:
+        verdict = "Database is close and fast. If pages still feel slow, the cause is the phone's network or Render's small CPU."
+    elif avg < 120:
+        verdict = "Database speed is acceptable. Moving Render and Turso to the same region could still help."
+    else:
+        verdict = "Database is far from the app (slow round trips). Put the Render service and the Turso database in the same region, e.g. both in Singapore."
+    rows = [
+        ("Database", "Turso (remote)" if remote else "Local file"),
+        ("Time to open a database connection", f"{connect_ms:.0f} ms"),
+        ("Average time of one query (5 tests)", f"{avg:.0f} ms (fastest {min(samples):.0f}, slowest {max(samples):.0f})"),
+        ("Heavy query (count + total PDF size)", f"{count_ms:.0f} ms"),
+        ("Papers stored / total PDF size", f"{n} / {int(total) / 1048576:.1f} MB"),
+        ("Pages & lists kept in memory", f"{len(_CACHE)} items"),
+        ("PDFs kept in memory", f"{len(_BLOBS)} files, {_BLOB_BYTES / 1048576:.1f} MB"),
+    ]
+    table = "".join(f"<tr><td>{esc(k)}</td><td><b>{esc(v)}</b></td></tr>" for k, v in rows)
+    return HTMLResponse(f"""<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speed check</title><style>body{{font-family:system-ui,sans-serif;background:#E8DDD1;color:#261E19;margin:0;padding:20px}}
+.box{{max-width:620px;margin:0 auto;background:#FBF8F5;border:1px solid #D8C7B6;border-radius:18px;padding:22px}}
+td{{padding:8px 6px;border-bottom:1px solid #E8DDD1;font-size:.92rem}}a{{color:#A77A53;font-weight:600}}.v{{background:#EAF3E3;border-radius:12px;padding:12px 14px;margin:14px 0;font-weight:600}}</style></head>
+<body><div class="box"><h2 style="margin-top:0">Speed check</h2><table style="width:100%;border-collapse:collapse">{table}</table>
+<div class="v">{esc(verdict)}</div>
+<p style="font-size:.85rem;color:#7E6A5B">Tip: in your browser's Network tab, every response has a <b>Server-Timing</b> value showing how long the server itself took. Requests slower than 1.5 s are also written to the Render logs as "SLOW".</p>
+<a href="/">← Back</a></div></body></html>""")
+
+
+def get_pdf(item_id: int):
+    item = blob_get(("pdf", item_id))
+    if item:
+        return item
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT title, file_data FROM du_resources WHERE id = ?", (item_id,))
     row = cursor.fetchone()
     conn.close()
-    if row and row[1]:
-        safe_name = urllib.parse.quote(f"{row[0]}.pdf")
-        return StreamingResponse(
-            io.BytesIO(row[1]),
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f"inline; filename*=UTF-8''{safe_name}",
-                "X-Content-Type-Options": "nosniff",
-                "Cache-Control": "public, max-age=604800, immutable",
-            },
-        )
-    return HTMLResponse("Not Found", status_code=404)
+    if not row or not row[1]:
+        return None
+    item = (row[0], bytes(row[1]))
+    blob_put(("pdf", item_id), item, len(item[1]))
+    return item
+
+
+def parse_range(header: str, size: int):
+    """None = no usable Range header (send everything); 'bad' = unsatisfiable; else (start, end)."""
+    m = re.fullmatch(r"bytes=(\d*)-(\d*)", (header or "").strip())
+    if not m or (m.group(1) == "" and m.group(2) == ""):
+        return None
+    start_s, end_s = m.groups()
+    if start_s == "":
+        length = int(end_s)
+        if length == 0:
+            return "bad"
+        start, end = max(size - length, 0), size - 1
+    else:
+        start = int(start_s)
+        end = min(int(end_s), size - 1) if end_s else size - 1
+    if start > end or start >= size:
+        return "bad"
+    return start, end
+
+
+@app.get("/view/{item_id}")
+def view_pdf(item_id: int, request: Request):
+    item = get_pdf(item_id)
+    if not item:
+        return HTMLResponse("Not Found", status_code=404)
+    title, data = item
+    size = len(data)
+    etag = f'"pdf-{item_id}-{size}"'
+    cache_control = "public, max-age=604800, immutable"
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": cache_control})
+    headers = {
+        "Content-Disposition": f"inline; filename*=UTF-8''{urllib.parse.quote(title + '.pdf')}",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": cache_control,
+        "ETag": etag,
+        "Accept-Ranges": "bytes",
+        "Content-Encoding": "identity",  # never gzip PDFs: it breaks partial downloads
+    }
+    rng = parse_range(request.headers.get("range", ""), size)
+    if rng == "bad":
+        return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+    if rng:
+        start, end = rng
+        headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+        return Response(content=data[start:end + 1], status_code=206, media_type="application/pdf", headers=headers)
+    return Response(content=data, media_type="application/pdf", headers=headers)
 
 
 @app.post("/delete/{item_id}")
@@ -2342,7 +2801,7 @@ def delete_item(request: Request, item_id: int):
     cursor.execute("DELETE FROM du_resources WHERE id = ?", (item_id,))
     conn.commit()
     conn.close()
-    return RedirectResponse(url=back_url(request), status_code=303)
+    return RedirectResponse(url=add_fresh(back_url(request)), status_code=303)
 
 
 if __name__ == "__main__":
