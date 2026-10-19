@@ -117,8 +117,96 @@ COURSE_TILES = [
     {"name": "B.Sc (prog) Physical science with Chemistry", "icon": "🧲", "label": "Physical science with chem"},
 ]
 
-SEMESTERS = ["All Semesters", "Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 6", "Sem 7", "Sem 8"]
+SEMESTERS = ["All Semesters", "Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 6"]
 UNSORTED = "Unsorted"
+
+# Modern line-icon set (24x24, drawn as inline SVG). Admin can pick any of these, or type any emoji.
+ICON_LIBRARY = {
+    "leaf": '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+    "sprout": '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
+    "flower": '<circle cx="12" cy="7" r="3"/><circle cx="17" cy="12" r="3"/><circle cx="12" cy="17" r="3"/><circle cx="7" cy="12" r="3"/><circle cx="12" cy="12" r="1.2"/>',
+    "tree": '<path d="M12 22v-5"/><path d="M12 17a5 5 0 0 0 5-5c0-1.2-.4-2.2-1-3a4 4 0 0 0-3.5-5.5A4 4 0 0 0 12 2a4 4 0 0 0-.5 1.5A4 4 0 0 0 8 9c-.6.8-1 1.8-1 3a5 5 0 0 0 5 5z"/>',
+    "dna": '<path d="M8 3c0 5 8 5 8 9s-8 4-8 9"/><path d="M16 3c0 5-8 5-8 9s8 4 8 9"/><path d="M9.2 6.5h5.6M8.4 12h7.2M9.2 17.5h5.6"/>',
+    "microscope": '<path d="M6 18h8"/><path d="M3 22h18"/><path d="M14 22a7 7 0 1 0 0-14h-1"/><path d="M9 14h2"/><path d="M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2Z"/><path d="M12 6V3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3"/>',
+    "flask": '<path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/>',
+    "atom": '<circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/>',
+    "sigma": '<path d="M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2"/>',
+    "infinity": '<path d="M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8"/>',
+    "shapes": '<path d="M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="17.5" cy="17.5" r="3.5"/>',
+    "code": '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
+    "monitor": '<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+    "cpu": '<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/>',
+    "database": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+    "network": '<rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/>',
+    "chart": '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+    "trending": '<path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/>',
+    "pie": '<path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>',
+    "dice": '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 8h.01M16 8h.01M8 16h.01M16 16h.01M12 12h.01"/>',
+    "globe": '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+    "droplet": '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+    "flame": '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+    "zap": '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+    "magnet": '<path d="m6 15-4-4 6.75-6.77a7.79 7.79 0 0 1 11 11L13 22l-4-4 6.39-6.36a2.14 2.14 0 0 0-3-3L6 15"/><path d="m5 8 4 4"/><path d="m12 15 4 4"/>',
+    "waves": '<path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>',
+    "telescope": '<path d="M3 11 18 5l2 5-15 6z"/><path d="M9 16l-2 6"/><path d="M12 15l2 7"/>',
+    "bug": '<path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6 13H2"/><path d="M22 13h-4"/>',
+    "mushroom": '<path d="M3 12a9 8 0 0 1 18 0Z"/><path d="M9 12v5a3 3 0 0 0 6 0v-5"/><path d="M8 8.5h.01M13 7h.01M16 10h.01"/>',
+    "fish": '<path d="M2 12c3-6 9-8 14-5l6 5-6 5c-5 3-11 1-14-5Z"/><path d="M16 11h.01"/>',
+    "paw": '<circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/>',
+    "bulb": '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+    "layers": '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+    "book": '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>',
+    "book-open": '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+    "file": '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+    "scale": '<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>',
+    "landmark": '<path d="M3 22h18"/><path d="M6 18v-7M10 18v-7M14 18v-7M18 18v-7"/><path d="M12 2 20 7H4z"/>',
+    "wallet": '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+    "cap": '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
+    "folder": '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+}
+
+
+def icon_svg(key: str, size: int = 30) -> str:
+    """Inline SVG for a library icon; anything else (e.g. an emoji the admin typed) is shown as escaped text."""
+    inner = ICON_LIBRARY.get(key or "")
+    if inner is None:
+        return esc(key)
+    return (
+        f'<svg viewBox="0 0 24 24" width="{size}" height="{size}" fill="none" stroke="currentColor" '
+        f'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{inner}</svg>'
+    )
+
+
+# Courses are now stored in the database (du_courses). These are only the starting values on first run.
+DEFAULT_COURSES = [  # (name, short label, icon)
+    ("B.Sc (Hons) Botany", "Botany", "leaf"),
+    ("B.Sc (Hons) Zoology", "Zoology", "paw"),
+    ("B.Sc (prog) Life Sciences", "Life Science", "dna"),
+    ("B.Sc (Hons) Chemistry", "Chemistry", "flask"),
+    ("B.Sc (Hons) Mathematics", "Mathematics", "shapes"),
+    ("B.Sc (Hons) Physics", "Physics", "atom"),
+    ("B.Sc (Hons) Computer Science", "Computer Sci", "code"),
+    ("B.Com (Hons)", "B.Com (H)", "wallet"),
+    ("B.A. (Hons) Economics", "Economics", "trending"),
+    ("B.Sc (prog) Physical science with Chemistry", "Physical science with chem", "magnet"),
+    ("B.Com (Programme)", "B.Com (Prog)", "wallet"),
+    ("B.A. (Hons) English", "English", "book-open"),
+    ("B.A. (Hons) Political Science", "Pol. Science", "landmark"),
+    ("B.A. Programme", "B.A. Prog", "cap"),
+    ("B.Tech / CIC", "B.Tech / CIC", "cpu"),
+    ("Postgraduate", "Postgraduate", "cap"),
+    ("General / Other", "General / Other", "folder"),
+]
+GENERAL_KEY = "General / Other"
+COURSE_LIST = []  # live list of dicts: key, name, label, icon, color
+
+
+def course_names():
+    return [c["name"] for c in COURSE_LIST]
+
+
+def course_tile(name: str):
+    return next((c for c in COURSE_LIST if c["name"] == name), None)
 
 # ───────────────────────── SUBJECT CATALOGUE ─────────────────────────
 # CURRICULUM is the live subject list, loaded from the du_subjects table (managed by the admin in the app).
@@ -133,8 +221,6 @@ CURRICULUM_SEED = {
         "Sem 4": ["Molecular Biology", "Plant Ecology & Phytogeography", "Plant Systematics"],
         "Sem 5": ["Reproductive Biology of Angiosperms", "Plant Physiology"],
         "Sem 6": ["Plant Metabolism", "Plant Biotechnology"],
-        "Sem 7": ["Molecular Biology", "Plant Ecology & Phytogeography", "Plant Systematics"],
-        "Sem 8": ["Molecular Biology", "Plant Ecology & Phytogeography", "Plant Systematics"],
     },
     "B.Sc (Hons) Zoology": {
         "Sem 1": ["Non-Chordates I", "Principles of Ecology"],
@@ -239,20 +325,20 @@ GRADIENTS = [
 
 # Ordered: first keyword found in the subject name wins
 SUBJECT_ICONS = [
-    ("non-chord", "🪼"), ("chordate", "🐟"), ("cell", "🔬"), ("algae", "🌊"), ("phyco", "🌊"),
-    ("myco", "🍄"), ("pathology", "🍄"), ("archegoniate", "🌱"), ("angiosperm", "🌸"),
-    ("anatomy", "🔍"), ("economic botany", "🌾"), ("econom", "📈"), ("ecolog", "🌍"),
-    ("physiolog", "💧"), ("metabol", "⚗️"), ("biotech", "🧫"), ("systematic", "🗂️"),
-    ("taxonom", "🗂️"), ("evolution", "🦴"), ("development", "🐣"), ("micro", "🦠"),
-    ("molecul", "🧬"), ("genetic", "🧬"), ("bio", "🧬"), ("inorganic", "🧪"), ("organic", "⚗️"),
-    ("chem", "🧪"), ("spectro", "🌈"), ("thermo", "🔥"), ("thermal", "🔥"), ("calculus", "∫"),
-    ("algebra", "➕"), ("analysis", "📐"), ("group", "🔣"), ("ring", "🔣"), ("mathematical", "📐"),
-    ("mechanic", "⚙️"), ("optic", "🔭"), ("wave", "🌊"), ("electr", "⚡"), ("magnet", "🧲"),
-    ("digital", "🔌"), ("analog", "🔌"), ("quantum", "⚛️"), ("solid state", "💎"),
-    ("program", "💻"), ("python", "🐍"), ("data", "🗃️"), ("discrete", "🔣"), ("operating", "🖥️"),
-    ("network", "🌐"), ("algorithm", "🧠"), ("artificial", "🤖"), ("account", "🧾"),
-    ("tax", "🧾"), ("law", "⚖️"), ("audit", "🧮"), ("market", "📣"), ("statist", "📊"),
-    ("probab", "🎲"), ("econometric", "📉"), ("english", "📖"), ("politic", "🏛️"),
+    ("non-chord", "fish"), ("chordate", "fish"), ("cell", "microscope"), ("algae", "waves"), ("phyco", "waves"),
+    ("myco", "mushroom"), ("pathology", "bug"), ("archegoniate", "sprout"), ("angiosperm", "flower"),
+    ("anatomy", "layers"), ("economic botany", "tree"), ("econom", "trending"), ("ecolog", "globe"),
+    ("physiolog", "droplet"), ("metabol", "flask"), ("biotech", "dna"), ("systematic", "layers"),
+    ("taxonom", "layers"), ("evolution", "paw"), ("development", "sprout"), ("micro", "bug"),
+    ("molecul", "dna"), ("genetic", "dna"), ("bio", "dna"), ("inorganic", "flask"), ("organic", "flask"),
+    ("chem", "flask"), ("spectro", "waves"), ("thermo", "flame"), ("thermal", "flame"), ("calculus", "infinity"),
+    ("algebra", "shapes"), ("analysis", "sigma"), ("group", "shapes"), ("ring", "shapes"), ("mathematical", "sigma"),
+    ("mechanic", "atom"), ("optic", "telescope"), ("wave", "waves"), ("electr", "zap"), ("magnet", "magnet"),
+    ("digital", "cpu"), ("analog", "cpu"), ("quantum", "atom"), ("solid state", "layers"),
+    ("program", "code"), ("python", "code"), ("data", "database"), ("discrete", "network"), ("operating", "monitor"),
+    ("network", "network"), ("algorithm", "cpu"), ("artificial", "bulb"), ("account", "wallet"),
+    ("tax", "wallet"), ("law", "scale"), ("audit", "file"), ("market", "chart"), ("statist", "pie"),
+    ("probab", "dice"), ("econometric", "chart"), ("english", "book-open"), ("politic", "landmark"),
 ]
 
 
@@ -261,7 +347,7 @@ def subject_icon(name: str) -> str:
     for kw, emoji in SUBJECT_ICONS:
         if kw in low:
             return emoji
-    return "📘"
+    return "book"
 
 
 def subject_gradient(name: str):
@@ -272,6 +358,13 @@ def icon_for(course: str, name: str) -> str:
     """Admin-chosen icon if set, otherwise the automatic one."""
     custom = SUBJECT_STYLE.get((course, name), ("", ""))[0]
     return custom or subject_icon(name)
+
+
+def course_gradient(c: dict):
+    col = c.get("color", "")
+    if col.isdigit() and int(col) < len(GRADIENTS):
+        return GRADIENTS[int(col)]
+    return subject_gradient(c["name"])
 
 
 def gradient_for(course: str, name: str):
@@ -410,6 +503,29 @@ def detect_course(lower: str) -> str:
     return "General / Other"
 
 
+def pick_course(lower: str, filename: str) -> str:
+    """Built-in keyword detection first, then the short titles of any courses the admin added."""
+    key = detect_course(lower)
+    if key != GENERAL_KEY:
+        for c in COURSE_LIST:
+            if c["key"] == key:
+                return c["name"]
+    tt = tokens(filename)
+    best, best_score = None, 0
+    for c in COURSE_LIST:
+        if c["key"] == GENERAL_KEY:
+            continue
+        sc = subject_score(tokens(c["label"]), tt)
+        if sc > best_score:
+            best, best_score = c["name"], sc
+    if best:
+        return best
+    for c in COURSE_LIST:
+        if c["key"] == GENERAL_KEY:
+            return c["name"]
+    return GENERAL_KEY
+
+
 def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallback_year: str):
     lower = fold(filename)
     detected_year = fallback_year.strip() if fallback_year.strip() else None
@@ -426,7 +542,7 @@ def parse_filename(filename: str, fallback_course: str, fallback_sem: str, fallb
             detected_sem = "Sem 1"
     detected_course = fallback_course
     if fallback_course == "auto":
-        detected_course = detect_course(lower)
+        detected_course = pick_course(lower, filename)
     base = unicodedata.normalize("NFKC", os.path.splitext(filename)[0])
     clean_title = re.sub(r"[_]+", " ", base).strip().title()
     return clean_title, detected_course, detected_sem, detected_year
@@ -445,6 +561,14 @@ def reload_curriculum(cursor):
     CURRICULUM.update(fresh)
     SUBJECT_STYLE.clear()
     SUBJECT_STYLE.update(style)
+
+
+def reload_courses(cursor):
+    cursor.execute("SELECT key, name, label, icon, color FROM du_courses ORDER BY position, id")
+    COURSE_LIST[:] = [
+        {"key": k, "name": n, "label": l or n, "icon": i or "folder", "color": col or ""}
+        for k, n, l, i, col in cursor.fetchall()
+    ]
 
 
 def ensure_subject(cursor, course: str, sem: str, name: str):
@@ -505,6 +629,47 @@ def init_db():
                 for n in names:
                     cursor.execute("INSERT OR IGNORE INTO du_subjects (course, semester, name) VALUES (?, ?, ?)", (c, sm, n))
         conn.commit()
+    # Courses table (add / rename / modify / delete from the main screen)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS du_courses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL UNIQUE,
+            label TEXT,
+            icon TEXT,
+            color TEXT,
+            position INTEGER DEFAULT 0
+        )
+    """)
+    conn.commit()
+    cursor.execute("SELECT COUNT(*) FROM du_courses")
+    if cursor.fetchone()[0] == 0:
+        for pos, (cname, clabel, cicon) in enumerate(DEFAULT_COURSES):
+            cursor.execute(
+                "INSERT OR IGNORE INTO du_courses (key, name, label, icon, color, position) VALUES (?, ?, ?, ?, ?, ?)",
+                (cname, cname, clabel, cicon, "", pos),
+            )
+        conn.commit()
+    # Courses that only exist on papers (older uploads) get a folder too
+    cursor.execute("SELECT DISTINCT course FROM du_resources WHERE course NOT IN (SELECT name FROM du_courses)")
+    for (cname,) in cursor.fetchall():
+        cursor.execute(
+            "INSERT OR IGNORE INTO du_courses (key, name, label, icon, color, position) VALUES (?, ?, ?, ?, ?, ?)",
+            (cname, cname, cname[:40], "folder", "", 999),
+        )
+    conn.commit()
+    reload_courses(cursor)
+    # Main-screen background image (single row)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS du_background (
+            id INTEGER PRIMARY KEY,
+            data BLOB,
+            mime TEXT,
+            opacity INTEGER DEFAULT 15,
+            version INTEGER DEFAULT 1
+        )
+    """)
+    conn.commit()
     # Register subjects that so far exist only on papers (typed during earlier uploads)
     cursor.execute(
         "SELECT course, subject, MIN(semester) FROM du_resources "
@@ -561,7 +726,7 @@ PWA_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" 
   <text x="256" y="365" font-family="sans-serif" font-size="34" letter-spacing="4" font-weight="bold" fill="#1E1A17" text-anchor="middle">VAULT</text>
 </svg>"""
 
-SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v18';
+SERVICE_WORKER_JS = """const CACHE_NAME = 'du-vault-cache-v19';
 const PRECACHE = [
   '/',
   '/manifest.json',
@@ -784,6 +949,15 @@ header {
 .sub-btn { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border-latte); background: #fff; color: var(--text-dark); font-size: 0.72rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .sub-btn:hover { background: var(--bg-latte); }
 .sub-btn.danger { color: #BA1A1A; }
+#app-bg { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 0; background-size: cover; background-position: center; background-repeat: no-repeat; pointer-events: none; }
+.container { position: relative; z-index: 1; }
+.subject-icon { color: #fff; transition: transform 0.28s cubic-bezier(.34,1.56,.64,1); }
+.subject-icon svg { width: 34px; height: 34px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.28)); }
+.subject-card:hover .subject-icon { transform: translateY(-2px) rotate(-5deg) scale(1.08); }
+.emoji-opt { color: var(--text-dark); display: flex; align-items: center; justify-content: center; padding: 0; }
+.emoji-opt svg { pointer-events: none; }
+.emoji-opt.sel { border-color: var(--caramel); background: var(--bg-latte); color: var(--caramel); }
+.folder-header-title svg { color: var(--caramel); }
 .emoji-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .emoji-opt { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border-latte); background: #fff; font-size: 1.1rem; cursor: pointer; }
 .emoji-opt:hover { background: var(--bg-latte); }
@@ -833,11 +1007,17 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
 .pdf-spinner { width: 44px; height: 44px; border: 3px solid rgba(167, 122, 83, 0.25); border-top: 3px solid var(--caramel); border-radius: 50%; animation: spinRing 0.9s linear infinite; margin-bottom: 14px; }
 @media (max-width: 480px) {
     .subject-grid { grid-template-columns: repeat(2, 1fr); }
+    .subject-grid { gap: 10px; }
+    .subject-card { padding: 12px 8px 12px; border-radius: 20px; }
+    .subject-icon { width: 54px; height: 54px; border-radius: 18px; margin-bottom: 8px; }
+    .subject-icon svg { width: 27px; height: 27px; }
+    .subject-title { font-size: 0.8rem; }
     .cards-layout-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
 <body>
+{bg_layer}
 <div id="loading-screen">
     <div class="loader-box">
         <div class="loader-ring"></div>
@@ -861,6 +1041,7 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
     {main_view_content}
 </div>
 {fab_controls}
+{bg_modal}
 <datalist id="subjectList">{subject_datalist}</datalist>
 <div id="pdfViewerModal">
     <div class="pdf-viewer-header">
@@ -950,7 +1131,7 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
             <div class="form-group"><label>Subject name</label><input type="text" name="name" maxlength="80" placeholder="e.g. Cell Biology" required></div>
             <div class="form-group"><label>Semester</label><select name="sem">{upload_sem_options}</select></div>
             <div class="form-group"><label>Icon <span style="font-weight:400;color:var(--text-muted);">(optional: pick one or type any emoji)</span></label>
-                <input type="text" name="icon" id="sa_icon" maxlength="8" placeholder="Auto" autocomplete="off">
+                <input type="text" name="icon" id="sa_icon" maxlength="16" placeholder="Auto" autocomplete="off">
                 <div class="emoji-grid" data-target="sa_icon"></div></div>
             <div class="form-group"><label>Colour</label><input type="hidden" name="color" id="sa_color" value=""><div class="color-grid" data-target="sa_color"></div></div>
             <div class="form-group"><label style="display:flex; gap:8px; align-items:flex-start; font-weight:500;">
@@ -970,10 +1151,40 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
             <div class="form-group"><label>Subject name</label><input type="text" name="new_name" id="se_name" maxlength="80" required></div>
             <div class="form-group"><label>Semester</label><select name="sem" id="se_sem">{upload_sem_options}</select></div>
             <div class="form-group"><label>Icon <span style="font-weight:400;color:var(--text-muted);">(empty = automatic)</span></label>
-                <input type="text" name="icon" id="se_icon" maxlength="8" placeholder="Auto" autocomplete="off">
+                <input type="text" name="icon" id="se_icon" maxlength="16" placeholder="Auto" autocomplete="off">
                 <div class="emoji-grid" data-target="se_icon"></div></div>
             <div class="form-group"><label>Colour</label><input type="hidden" name="color" id="se_color" value=""><div class="color-grid" data-target="se_color"></div></div>
             <div class="helper-text">Renaming also updates every paper filed under this subject.</div>
+            <button type="submit" class="btn-pill" style="margin-top: 12px;">Save Changes</button>
+        </form>
+    </div>
+</div>
+<div class="modal" id="courseAddModal" onclick="if(event.target === this) closeModal('courseAddModal')">
+    <div class="modal-content">
+        <div class="modal-title">Add Course</div>
+        <form action="/course/add" method="POST" onsubmit="showLoader()">
+            <div class="form-group"><label>Course name</label><input type="text" name="name" maxlength="80" placeholder="e.g. B.Sc (Hons) Statistics" required></div>
+            <div class="form-group"><label>Short title on the tile</label><input type="text" name="label" maxlength="40" placeholder="e.g. Statistics"></div>
+            <div class="form-group"><label>Icon <span style="font-weight:400;color:var(--text-muted);">(pick one or type any emoji)</span></label>
+                <input type="text" name="icon" id="ca_icon" maxlength="16" placeholder="Auto" autocomplete="off">
+                <div class="emoji-grid" data-target="ca_icon"></div></div>
+            <div class="form-group"><label>Colour</label><input type="hidden" name="color" id="ca_color" value=""><div class="color-grid" data-target="ca_color"></div></div>
+            <button type="submit" class="btn-pill btn-caramel" style="margin-top: 8px;">Add Course</button>
+        </form>
+    </div>
+</div>
+<div class="modal" id="courseEditModal" onclick="if(event.target === this) closeModal('courseEditModal')">
+    <div class="modal-content">
+        <div class="modal-title">Edit Course</div>
+        <form action="/course/edit" method="POST" onsubmit="showLoader()">
+            <input type="hidden" name="old_name" id="ce_old">
+            <div class="form-group"><label>Course name</label><input type="text" name="name" id="ce_name" maxlength="80" required></div>
+            <div class="form-group"><label>Short title on the tile</label><input type="text" name="label" id="ce_label" maxlength="40"></div>
+            <div class="form-group"><label>Icon</label>
+                <input type="text" name="icon" id="ce_icon" maxlength="16" placeholder="Auto" autocomplete="off">
+                <div class="emoji-grid" data-target="ce_icon"></div></div>
+            <div class="form-group"><label>Colour</label><input type="hidden" name="color" id="ce_color" value=""><div class="color-grid" data-target="ce_color"></div></div>
+            <div class="helper-text">Renaming also updates every subject and paper filed under this course.</div>
             <button type="submit" class="btn-pill" style="margin-top: 12px;">Save Changes</button>
         </form>
     </div>
@@ -1115,28 +1326,39 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
         openModal('editModal');
     }
     const GRADS = {gradients_json};
-    const EMOJIS = ['🌿','🌱','🌸','🍃','🌳','🌾','🍄','🌊','🦠','🔬','🧬','🧫','🧪','⚗️','🌍','💧','🔥','⚡','🧲','🔭','⚛️','📐','➕','📊','📈','💻','🧠','📖','⚖️','🏛️','🦴','🐟','🪼','🐣','🦁','🐝'];
+    const ICONS = {icons_json};
+    function svgIcon(key, size) {
+        return '<svg viewBox="0 0 24 24" width="' + size + '" height="' + size + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ICONS[key] + '</svg>';
+    }
     function markColors(inputId) {
         const val = document.getElementById(inputId).value;
         const grid = document.querySelector('.color-grid[data-target="' + inputId + '"]');
         grid.querySelectorAll('.color-opt').forEach(b => b.classList.toggle('sel', b.dataset.v === val));
     }
+    function markIcons(inputId) {
+        const val = document.getElementById(inputId).value;
+        const grid = document.querySelector('.emoji-grid[data-target="' + inputId + '"]');
+        grid.querySelectorAll('.emoji-opt').forEach(b => b.classList.toggle('sel', b.dataset.v === val));
+    }
     function buildPickers() {
         document.querySelectorAll('.emoji-grid').forEach(g => {
             const input = document.getElementById(g.dataset.target);
-            EMOJIS.forEach(e => {
+            Object.keys(ICONS).forEach(k => {
                 const b = document.createElement('button');
-                b.type = 'button'; b.className = 'emoji-opt'; b.textContent = e;
-                b.onclick = () => { input.value = e; };
+                b.type = 'button'; b.className = 'emoji-opt'; b.title = k; b.dataset.v = k;
+                b.innerHTML = svgIcon(k, 18);
+                b.onclick = () => { input.value = k; markIcons(g.dataset.target); };
                 g.appendChild(b);
             });
+            input.addEventListener('input', () => markIcons(g.dataset.target));
         });
         document.querySelectorAll('.color-grid').forEach(g => {
             const input = document.getElementById(g.dataset.target);
             const make = (label, v, bg) => {
                 const b = document.createElement('button');
                 b.type = 'button'; b.className = 'color-opt' + (v === '' ? ' auto' : ''); b.dataset.v = v;
-                if (bg) b.style.background = bg; if (label) b.textContent = label;
+                if (bg) b.style.background = bg;
+                if (label) b.textContent = label;
                 b.onclick = () => { input.value = v; markColors(g.dataset.target); };
                 g.appendChild(b);
             };
@@ -1145,11 +1367,15 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
         });
     }
     document.addEventListener('DOMContentLoaded', buildPickers);
+    function setPicker(prefix, icon, color) {
+        document.getElementById(prefix + '_icon').value = icon || '';
+        document.getElementById(prefix + '_color').value = color || '';
+        markIcons(prefix + '_icon');
+        markColors(prefix + '_color');
+    }
     function openAddSubject(btn) {
         document.getElementById('sa_course').value = btn.dataset.course;
-        document.getElementById('sa_icon').value = '';
-        document.getElementById('sa_color').value = '';
-        markColors('sa_color');
+        setPicker('sa', '', '');
         openModal('subjectAddModal');
     }
     function openSubjectModal(btn) {
@@ -1158,10 +1384,20 @@ select { flex: 1; padding: 11px 14px; border-radius: 18px; border: 1px solid var
         document.getElementById('se_old').value = d.name;
         document.getElementById('se_name').value = d.name;
         document.getElementById('se_sem').value = d.sem;
-        document.getElementById('se_icon').value = d.icon || '';
-        document.getElementById('se_color').value = d.color || '';
-        markColors('se_color');
+        setPicker('se', d.icon, d.color);
         openModal('subjectEditModal');
+    }
+    function openAddCourse() {
+        setPicker('ca', '', '');
+        openModal('courseAddModal');
+    }
+    function openCourseModal(btn) {
+        const d = btn.dataset;
+        document.getElementById('ce_old').value = d.name;
+        document.getElementById('ce_name').value = d.name;
+        document.getElementById('ce_label').value = d.label;
+        setPicker('ce', d.icon, d.color);
+        openModal('courseEditModal');
     }
     function filterCardsLive(query) {
         const term = query.toLowerCase().trim();
@@ -1212,17 +1448,48 @@ def _subject_card_core(course: str, name: str, count: int) -> str:
     label = "paper" if count == 1 else "papers"
     return f"""
     <a href="{esc(href)}" class="subject-card" style="--g1:{g1};--g2:{g2}">
-        <div class="subject-icon"><span>{esc(icon_for(course, name))}</span></div>
+        <div class="subject-icon"><span>{icon_svg(icon_for(course, name))}</span></div>
         <div class="subject-title">{esc(name)}</div>
         <div class="subject-count">{count} {label}</div>
     </a>
     """
 
 
+def course_card_html(c: dict, count: int, admin: bool) -> str:
+    g1, g2 = course_gradient(c)
+    href = f"/?course={urlq(c['name'])}"
+    label = "paper" if count == 1 else "papers"
+    card = f"""
+    <a href="{esc(href)}" class="subject-card" style="--g1:{g1};--g2:{g2}">
+        <div class="subject-icon"><span>{icon_svg(c["icon"])}</span></div>
+        <div class="subject-title">{esc(c["label"])}</div>
+        <div class="subject-count">{count} {label}</div>
+    </a>
+    """
+    if not admin:
+        return card
+    return f"""
+    <div class="subject-wrap">
+        {card}
+        <div class="subject-admin">
+            <button type="button" class="sub-btn" title="Rename / change icon"
+                data-name="{esc(c["name"])}" data-label="{esc(c["label"])}"
+                data-icon="{esc(c["icon"])}" data-color="{esc(c["color"])}"
+                onclick="openCourseModal(this)">✎</button>
+            <form action="/course/delete" method="POST"
+                onsubmit="return confirm('Delete this course? Its subject folders are removed and its papers move to General / Other.');">
+                <input type="hidden" name="name" value="{esc(c["name"])}">
+                <button type="submit" class="sub-btn danger" title="Delete course">✕</button>
+            </form>
+        </div>
+    </div>
+    """
+
+
 def crumbs_html(course: str, subject: str, q: str) -> str:
     parts = ['<a href="/">Home</a>']
     if course:
-        tile = next((t for t in COURSE_TILES if t["name"] == course), None)
+        tile = course_tile(course)
         label = tile["label"] if tile else course
         if subject or q:
             parts.append(f'<a href="/?course={esc(urlq(course))}">{esc(label)}</a>')
@@ -1236,30 +1503,28 @@ def crumbs_html(course: str, subject: str, q: str) -> str:
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, q: str = "", course: str = "", sem: str = "All Semesters", subject: str = "", notice: str = ""):
+def index(request: Request, q: str = "", course: str = "", sem: str = "All Semesters", subject: str = "", notice: str = "", year: str = ""):
     admin = is_admin(request)
     q = q.strip()
     conn = get_db()
     cursor = conn.cursor()
     reload_curriculum(cursor)
+    reload_courses(cursor)
     main_view_content = ""
+    bg_layer = ""
+    bg_modal = ""
 
     # ── LEVEL 1: Home → course folders
     if not course and not q and not subject:
         cursor.execute("SELECT course, COUNT(*) FROM du_resources GROUP BY course")
         counts = dict(cursor.fetchall())
-        folders_grid = '<div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">Select Course Folder</div>'
-        folders_grid += '<div class="folder-grid">'
-        for tile in COURSE_TILES:
-            num_papers = counts.get(tile["name"], 0)
-            folders_grid += f"""
-            <a href="/?course={esc(urlq(tile["name"]))}" class="folder-card">
-                <div class="folder-card-icon">{tile["icon"]}</div>
-                <div class="folder-card-title">{esc(tile["label"])}</div>
-                <div class="folder-card-count">{num_papers} papers</div>
-            </a>
-            """
-        folders_grid += "</div>"
+        folders_grid = '<div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 6px 0 12px;">Select Course Folder</div>'
+        if COURSE_LIST:
+            folders_grid += '<div class="subject-grid">' + "".join(
+                course_card_html(c, counts.get(c["name"], 0), admin) for c in COURSE_LIST
+            ) + "</div>"
+        else:
+            folders_grid += '<div class="card" style="text-align:center; padding:40px;"><p style="color:var(--text-muted);">No courses yet.</p></div>'
         search_bar = """
         <form method="GET" action="/">
             <div class="search-box" style="margin-top: 10px;">
@@ -1267,7 +1532,58 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
             </div>
         </form>
         """
-        main_view_content = search_bar + folders_grid
+        home_tools = ""
+        if admin:
+            home_tools = (
+                '<div style="display:flex; gap:8px; flex-wrap:wrap; margin:4px 0 4px;">'
+                '<button type="button" class="back-folder-btn" style="border:none;cursor:pointer;background:var(--caramel);" '
+                'onclick="openAddCourse()">➕ Add Course</button>'
+                '<button type="button" class="back-folder-btn" style="border:none;cursor:pointer;" '
+                'onclick="openModal(\'bgModal\')">🖼 Background</button></div>'
+            )
+        main_view_content = search_bar + home_tools + folders_grid
+        # Background image (main screen only)
+        cursor.execute("SELECT version, opacity FROM du_background WHERE id = 1")
+        bg_row = cursor.fetchone()
+        if bg_row:
+            bg_ver = int(bg_row[0] or 1)
+            bg_op = max(5, min(40, int(bg_row[1] if bg_row[1] is not None else 15)))
+            bg_layer = f'<div id="app-bg" style="background-image:url(\'/bg?v={bg_ver}\'); opacity:{bg_op / 100:.2f};"></div>'
+        else:
+            bg_op = 15
+        if admin:
+            preview = (
+                f'<img src="/bg?v={bg_ver}" alt="Current background" style="width:100%; max-height:150px; object-fit:cover; border-radius:14px; margin-bottom:12px; opacity:0.8;">'
+                if bg_row else '<div class="helper-text" style="margin-bottom:10px;">No background image set yet.</div>'
+            )
+            remove_form = (
+                '<form action="/background/delete" method="POST" style="margin-top:10px;" '
+                'onsubmit="return confirm(\'Remove the background image?\');">'
+                '<button type="submit" class="btn-pill" style="background:#BA1A1A;">Remove Background</button></form>'
+                if bg_row else ""
+            )
+            bg_modal = f"""
+            <div class="modal" id="bgModal" onclick="if(event.target === this) closeModal('bgModal')">
+                <div class="modal-content">
+                    <div class="modal-title">Main Screen Background</div>
+                    {preview}
+                    <form action="/background/save" method="POST" enctype="multipart/form-data" onsubmit="showLoader()">
+                        <div class="form-group">
+                            <label>{"Replace image" if bg_row else "Upload image"} (JPG, PNG or WebP, up to 6 MB)</label>
+                            <input type="file" name="file" accept="image/jpeg,image/png,image/webp">
+                            <div class="helper-text">Leave empty to keep the current image and only change the opacity.</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Opacity: <span id="bgOpVal">{bg_op}</span>%</label>
+                            <input type="range" name="opacity" min="5" max="40" value="{bg_op}" oninput="document.getElementById('bgOpVal').innerText = this.value">
+                            <div class="helper-text">Kept faint on purpose (max 40%) so every course stays clearly visible.</div>
+                        </div>
+                        <button type="submit" class="btn-pill btn-caramel">Save Background</button>
+                    </form>
+                    {remove_form}
+                </div>
+            </div>
+            """
 
     # ── LEVEL 2: Course → subject folders (grouped by semester)
     elif course and not subject and not q:
@@ -1287,8 +1603,8 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
                 if subj not in extra[sm]:
                     extra[sm].append(subj)
 
-        tile = next((t for t in COURSE_TILES if t["name"] == course), None)
-        icon = tile["icon"] if tile else "📁"
+        tile = course_tile(course)
+        icon = icon_svg(tile["icon"], 26) if tile else icon_svg("folder", 26)
         label = tile["label"] if tile else course
         add_btn = (
             f'<button type="button" class="back-folder-btn" style="border:none;cursor:pointer;background:var(--caramel);" '
@@ -1341,9 +1657,12 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
         if subject:
             query += " AND subject = ?"
             params.append(subject)
-        if sem != "All Semesters":
+        if sem != "All Semesters" and not subject:
             query += " AND semester = ?"
             params.append(sem)
+        if subject and year and year != "All Years":
+            query += " AND year = ?"
+            params.append(year)
         if q:
             query += " AND (LOWER(title) LIKE ? OR LOWER(course) LIKE ? OR LOWER(year) LIKE ? OR LOWER(subject) LIKE ?)"
             wc = f"%{q.lower()}%"
@@ -1352,14 +1671,14 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
         cursor.execute(query, tuple(params))
         records = cursor.fetchall()
 
-        tile = next((t for t in COURSE_TILES if t["name"] == course), None)
+        tile = course_tile(course)
         if subject:
-            folder_icon = esc(icon_for(course, subject))
+            folder_icon = icon_svg(icon_for(course, subject), 26)
             folder_display_name = subject
             back_href = f"/?course={urlq(course)}" if course else "/"
             back_label = "← Subjects" if course else "← All Folders"
         else:
-            folder_icon = tile["icon"] if tile else "🔍"
+            folder_icon = icon_svg(tile["icon"], 26) if tile else "🔍"
             folder_display_name = (tile["label"] if tile else course) if course else f"Search: {q}"
             back_href = f"/?course={urlq(course)}" if (course and q) else "/"
             back_label = "← Subjects" if (course and q) else "← All Folders"
@@ -1369,17 +1688,32 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
             <a href="{esc(back_href)}" class="back-folder-btn">{back_label}</a>
         </div>
         """
-        sem_options = "".join(
-            f'<option value="{esc(s)}" {"selected" if s == sem else ""}>{esc(s)}</option>' for s in SEMESTERS
-        )
+        if subject:
+            # Inside a subject the semester is already known, so filter by exam year instead
+            cursor.execute("SELECT DISTINCT year FROM du_resources WHERE course = ? AND subject = ?", (course, subject))
+            years = sorted(
+                {r[0] for r in cursor.fetchall() if r[0]},
+                key=lambda v: (not v.isdigit(), -int(v) if v.isdigit() else 0, v),
+            )
+            year_options = '<option value="All Years">All Years</option>' + "".join(
+                f'<option value="{esc(v)}" {"selected" if v == year else ""}>{esc(v)}</option>' for v in years
+            )
+            filter_select = f'<select name="year" onchange="this.form.submit()">{year_options}</select>'
+            search_placeholder = f"🔍 Search in {subject}..."
+        else:
+            sem_options = "".join(
+                f'<option value="{esc(s)}" {"selected" if s == sem else ""}>{esc(s)}</option>' for s in SEMESTERS
+            )
+            filter_select = f'<select name="sem" onchange="this.form.submit()">{sem_options}</select>'
+            search_placeholder = "🔍 Live search in this list..."
         search_filter_form = f"""
         <form method="GET" action="/">
             <input type="hidden" name="course" value="{esc(course)}">
             <input type="hidden" name="subject" value="{esc(subject)}">
             <div class="search-box">
-                <input type="text" name="q" value="{esc(q)}" placeholder="🔍 Live search in this list..." onkeyup="filterCardsLive(this.value)">
+                <input type="text" name="q" value="{esc(q)}" placeholder="{esc(search_placeholder)}" onkeyup="filterCardsLive(this.value)" autocomplete="off">
             </div>
-            <div class="filters"><select name="sem" onchange="this.form.submit()">{sem_options}</select></div>
+            <div class="filters">{filter_select}</div>
         </form>
         """
         if not records:
@@ -1444,7 +1778,7 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
     known.discard(UNSORTED)
     subject_datalist = "".join(f'<option value="{esc(n)}"></option>' for n in sorted(known))
 
-    up_course_opts = "".join(f'<option value="{esc(c)}">{esc(c)}</option>' for c in COURSES[1:])
+    up_course_opts = "".join(f'<option value="{esc(c)}">{esc(c)}</option>' for c in course_names())
     up_sem_opts = "".join(f'<option value="{esc(s)}">{esc(s)}</option>' for s in SEMESTERS[1:])
     if admin:
         admin_header_btn = '<a href="/logout" class="admin-lock-btn">Logout</a>'
@@ -1465,6 +1799,9 @@ def index(request: Request, q: str = "", course: str = "", sem: str = "All Semes
     content = content.replace("{upload_sem_options}", up_sem_opts)
     content = content.replace("{subject_datalist}", subject_datalist)
     content = content.replace("{gradients_json}", json.dumps(GRADIENTS))
+    content = content.replace("{icons_json}", json.dumps(ICON_LIBRARY))
+    content = content.replace("{bg_layer}", bg_layer)
+    content = content.replace("{bg_modal}", bg_modal)
     content = content.replace("{admin_header_btn}", admin_header_btn)
     content = content.replace("{admin_banner_html}", admin_banner_html)
     content = content.replace("{fab_controls}", fab_controls)
@@ -1517,7 +1854,7 @@ async def upload_files(
 ):
     if not is_admin(request):
         return HTMLResponse("Unauthorized. Please log in as Admin.", status_code=403)
-    if course != "auto" and course not in COURSES[1:]:
+    if course != "auto" and course not in course_names():
         course = "auto"
     if sem != "auto" and sem not in SEMESTERS[1:]:
         sem = "auto"
@@ -1559,7 +1896,7 @@ def edit_item(
 ):
     if not is_admin(request):
         return HTMLResponse("Unauthorized.", status_code=403)
-    if course not in COURSES[1:] or sem not in SEMESTERS[1:]:
+    if course not in course_names() or sem not in SEMESTERS[1:]:
         return HTMLResponse("Invalid course or semester.", status_code=400)
     final_subject = resolve_subject(course, sem, subject, title)
     conn = get_db()
@@ -1591,7 +1928,7 @@ def add_link(
         return HTMLResponse("Unauthorized.", status_code=403)
     if not safe_http_url(url):
         return HTMLResponse("Only http:// or https:// links are allowed.", status_code=400)
-    if course not in COURSES[1:] or sem not in SEMESTERS[1:]:
+    if course not in course_names() or sem not in SEMESTERS[1:]:
         return HTMLResponse("Invalid course or semester.", status_code=400)
     final_subject = resolve_subject(course, sem, subject, title)
     conn = get_db()
@@ -1622,7 +1959,7 @@ def subject_exists(course: str, name: str, ignore: str = "") -> bool:
 
 
 def clean_icon(icon: str) -> str:
-    return (icon or "").strip()[:8]
+    return (icon or "").strip()[:16]
 
 
 def clean_color(color: str) -> str:
@@ -1648,6 +1985,229 @@ def sort_papers(cursor, course: str, only: str = None, include_sorted: bool = Fa
     return moved
 
 
+def clean_text(value: str, limit: int) -> str:
+    return " ".join((value or "").split())[:limit]
+
+
+def course_by_name(name: str):
+    return next((c for c in COURSE_LIST if c["name"] == name), None)
+
+
+def course_name_taken(name: str, ignore: str = "") -> bool:
+    return any(c["name"].casefold() == name.casefold() and c["name"] != ignore for c in COURSE_LIST)
+
+
+@app.post("/course/add")
+def course_add(
+    request: Request,
+    name: str = Form(...),
+    label: str = Form(""),
+    icon: str = Form(""),
+    color: str = Form(""),
+):
+    if not is_admin(request):
+        return HTMLResponse("Unauthorized.", status_code=403)
+    name = clean_text(name, 80)
+    label = clean_text(label, 40) or name[:40]
+    if not name or name.casefold() == "all courses":
+        return HTMLResponse("Please enter a valid course name.", status_code=400)
+    conn = get_db()
+    cursor = conn.cursor()
+    reload_courses(cursor)
+    if course_name_taken(name):
+        conn.close()
+        return HTMLResponse("A course with this name already exists.", status_code=400)
+    cursor.execute("SELECT COALESCE(MAX(position), 0) + 1 FROM du_courses")
+    pos = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM du_courses WHERE key = ?", (name,))
+    key = name if cursor.fetchone()[0] == 0 else f"{name}#{pos}"
+    cursor.execute(
+        "INSERT INTO du_courses (key, name, label, icon, color, position) VALUES (?, ?, ?, ?, ?, ?)",
+        (key, name, label, clean_icon(icon) or "folder", clean_color(color), pos),
+    )
+    conn.commit()
+    reload_courses(cursor)
+    conn.close()
+    return RedirectResponse(url=f"/?notice={urlq(f'Course added: {name}')}", status_code=303)
+
+
+@app.post("/course/edit")
+def course_edit(
+    request: Request,
+    old_name: str = Form(...),
+    name: str = Form(...),
+    label: str = Form(""),
+    icon: str = Form(""),
+    color: str = Form(""),
+):
+    if not is_admin(request):
+        return HTMLResponse("Unauthorized.", status_code=403)
+    name = clean_text(name, 80)
+    label = clean_text(label, 40) or name[:40]
+    if not name or name.casefold() == "all courses":
+        return HTMLResponse("Please enter a valid course name.", status_code=400)
+    conn = get_db()
+    cursor = conn.cursor()
+    reload_courses(cursor)
+    if not course_by_name(old_name):
+        conn.close()
+        return HTMLResponse("Course not found.", status_code=404)
+    if course_name_taken(name, ignore=old_name):
+        conn.close()
+        return HTMLResponse("Another course already has that name.", status_code=400)
+    cursor.execute(
+        "UPDATE du_courses SET name = ?, label = ?, icon = ?, color = ? WHERE name = ?",
+        (name, label, clean_icon(icon) or "folder", clean_color(color), old_name),
+    )
+    if name != old_name:
+        cursor.execute("UPDATE du_resources SET course = ? WHERE course = ?", (name, old_name))
+        cursor.execute("UPDATE du_subjects SET course = ? WHERE course = ?", (name, old_name))
+    conn.commit()
+    reload_courses(cursor)
+    reload_curriculum(cursor)
+    conn.close()
+    return RedirectResponse(url=f"/?notice={urlq('Course saved.')}", status_code=303)
+
+
+@app.post("/course/delete")
+def course_delete(request: Request, name: str = Form(...)):
+    """Deletes the course folder and its subject folders. Papers are kept and moved to 'General / Other'."""
+    if not is_admin(request):
+        return HTMLResponse("Unauthorized.", status_code=403)
+    conn = get_db()
+    cursor = conn.cursor()
+    reload_courses(cursor)
+    target = course_by_name(name)
+    general = next((c for c in COURSE_LIST if c["key"] == GENERAL_KEY), None)
+    if not target:
+        conn.close()
+        return HTMLResponse("Course not found.", status_code=404)
+    if target["key"] == GENERAL_KEY or general is None:
+        conn.close()
+        return HTMLResponse("'General / Other' is the safety folder and can't be deleted.", status_code=400)
+    cursor.execute("SELECT COUNT(*) FROM du_resources WHERE course = ?", (name,))
+    n = cursor.fetchone()[0]
+    cursor.execute("UPDATE du_resources SET course = ?, subject = ? WHERE course = ?", (general["name"], UNSORTED, name))
+    cursor.execute("DELETE FROM du_subjects WHERE course = ?", (name,))
+    cursor.execute("DELETE FROM du_courses WHERE name = ?", (name,))
+    conn.commit()
+    reload_courses(cursor)
+    reload_curriculum(cursor)
+    conn.close()
+    note = f"Course deleted. {n} paper(s) moved to {general['name']}." if n else "Course deleted."
+    return RedirectResponse(url=f"/?notice={urlq(note)}", status_code=303)
+
+
+# ───────────── routes: main-screen background ─────────────
+BG_MAX_BYTES = 6 * 1024 * 1024
+
+
+def sniff_image(data: bytes):
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def prepare_background(data: bytes):
+    """Validate by file signature, then shrink to max 1920px JPEG if Pillow is installed."""
+    mime = sniff_image(data)
+    if not mime:
+        return None
+    try:
+        from PIL import Image
+    except ImportError:
+        return (data, mime) if len(data) <= 3 * 1024 * 1024 else None
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.load()
+        img = img.convert("RGB")
+        img.thumbnail((1920, 1920))
+        out = io.BytesIO()
+        img.save(out, "JPEG", quality=80, optimize=True)
+        return out.getvalue(), "image/jpeg"
+    except Exception:
+        return None
+
+
+@app.get("/bg")
+def get_background():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT data, mime FROM du_background WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+    if not row or not row[0]:
+        return HTMLResponse("No background", status_code=404)
+    return Response(
+        content=bytes(row[0]),
+        media_type=row[1] or "image/jpeg",
+        headers={"Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.post("/background/save")
+async def background_save(
+    request: Request,
+    opacity: int = Form(15),
+    file: UploadFile = File(None),
+):
+    if not is_admin(request):
+        return HTMLResponse("Unauthorized.", status_code=403)
+    opacity = max(5, min(40, opacity))
+    new_image = None
+    if file is not None and file.filename:
+        data = await file.read()
+        if len(data) > BG_MAX_BYTES:
+            return HTMLResponse("Image is too large (max 6 MB).", status_code=400)
+        new_image = prepare_background(data)
+        if not new_image:
+            return HTMLResponse(
+                "Please upload a valid JPG, PNG or WebP image (without Pillow installed, up to 3 MB).", status_code=400
+            )
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT version FROM du_background WHERE id = 1")
+    row = cursor.fetchone()
+    if new_image:
+        blob, mime = new_image
+        if row:
+            cursor.execute(
+                "UPDATE du_background SET data = ?, mime = ?, opacity = ?, version = ? WHERE id = 1",
+                (blob, mime, opacity, int(row[0] or 1) + 1),
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO du_background (id, data, mime, opacity, version) VALUES (1, ?, ?, ?, 1)",
+                (blob, mime, opacity),
+            )
+        note = "Background saved."
+    elif row:
+        cursor.execute("UPDATE du_background SET opacity = ? WHERE id = 1", (opacity,))
+        note = "Background opacity updated."
+    else:
+        conn.close()
+        return HTMLResponse("Choose an image to upload first.", status_code=400)
+    conn.commit()
+    conn.close()
+    return RedirectResponse(url=f"/?notice={urlq(note)}", status_code=303)
+
+
+@app.post("/background/delete")
+def background_delete(request: Request):
+    if not is_admin(request):
+        return HTMLResponse("Unauthorized.", status_code=403)
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM du_background WHERE id = 1")
+    conn.commit()
+    conn.close()
+    return RedirectResponse(url=f"/?notice={urlq('Background removed.')}", status_code=303)
+
+
 @app.post("/subject/add")
 def subject_add(
     request: Request,
@@ -1661,7 +2221,7 @@ def subject_add(
     if not is_admin(request):
         return HTMLResponse("Unauthorized.", status_code=403)
     name = clean_subject_name(name)
-    if course not in COURSES[1:] or sem not in SEMESTERS[1:] or not name or name.casefold() == UNSORTED.casefold():
+    if course not in course_names() or sem not in SEMESTERS[1:] or not name or name.casefold() == UNSORTED.casefold():
         return HTMLResponse("Invalid course, semester or subject name.", status_code=400)
     conn = get_db()
     cursor = conn.cursor()
@@ -1698,7 +2258,7 @@ def subject_edit(
     if not is_admin(request):
         return HTMLResponse("Unauthorized.", status_code=403)
     new_name = clean_subject_name(new_name)
-    if course not in COURSES[1:] or sem not in SEMESTERS[1:] or not new_name or new_name.casefold() == UNSORTED.casefold():
+    if course not in course_names() or sem not in SEMESTERS[1:] or not new_name or new_name.casefold() == UNSORTED.casefold():
         return HTMLResponse("Invalid course, semester or subject name.", status_code=400)
     conn = get_db()
     cursor = conn.cursor()
