@@ -118,17 +118,34 @@ def cached(key, fn):
 # and refreshes them in the background. Page views then need no database at all.
 SNAP = {"ready": False, "at": 0.0, "sig": None, "papers": [], "bg": None}
 _SNAP_LOCK = threading.Lock()
+_EXEC = ThreadPoolExecutor(max_workers=4, thread_name_prefix="snap")
 SNAP_TTL = 45  # seconds between quiet background refreshes (admin changes refresh immediately)
 
 
 def _q(sql, params=()):
-    conn = get_db()
-    try:
-        cur = conn.cursor()
-        cur.execute(sql, params)
-        return cur.fetchall()
-    finally:
-        conn.close()
+    """Read helper: reuses this thread's connection; if it had gone stale, reconnects and tries once more."""
+    for attempt in (1, 2):
+        conn = get_db()
+        try:
+            cur = conn.cursor()
+            cur.execute(sql, params)
+            return cur.fetchall()
+        except Exception:
+            _tls.raw = None  # drop the bad connection
+            if attempt == 2:
+                raise
+        finally:
+            conn.close()
+
+
+class _SharedPool:
+    """Lets the snapshot refresh reuse the same 4 worker threads (and so their open connections) every time."""
+
+    def __enter__(self):
+        return _EXEC
+
+    def __exit__(self, *exc):
+        return False
 
 
 def apply_courses(rows):
@@ -157,7 +174,7 @@ def refresh_snapshot(block=False, force=False):
     try:
         if not force and SNAP["ready"] and time.time() - SNAP["at"] < 5:
             return True
-        with ThreadPoolExecutor(max_workers=4) as ex:
+        with _SharedPool() as ex:
             futs = [
                 ex.submit(_q, "SELECT key, name, label, icon, color FROM du_courses ORDER BY position, id"),
                 ex.submit(_q, "SELECT course, semester, name, icon, color FROM du_subjects ORDER BY id"),
@@ -295,11 +312,60 @@ def add_fresh(url: str) -> str:
     return url + ("&" if "?" in url else "?") + "fresh=1"
 
 
-def get_db():
+def _open_raw():
     if TURSO_DB_URL and TURSO_AUTH_TOKEN:
         return sqlite3.connect(TURSO_DB_URL, auth_token=TURSO_AUTH_TOKEN)
-    else:
-        return sqlite3.connect("du_pyq_vault.db")
+    return sqlite3.connect("du_pyq_vault.db")
+
+
+# Opening a brand-new Turso connection costs about a second for its first question. So each worker thread keeps
+# its connection open and reuses it (a connection is only ever used by the thread that created it).
+_tls = threading.local()
+IDLE_CHECK_SECONDS = 5  # after this much idle time, test the connection before trusting it
+
+
+class PooledConn:
+    """Behaves like a normal connection, but close() keeps the real one for the next request on this thread."""
+
+    def __init__(self, raw):
+        self._raw = raw
+
+    def cursor(self):
+        return self._raw.cursor()
+
+    def commit(self):
+        return self._raw.commit()
+
+    def rollback(self):
+        return self._raw.rollback()
+
+    def close(self):
+        try:
+            if getattr(self._raw, "in_transaction", False):
+                self._raw.rollback()  # never leave half-finished changes behind
+        except Exception:
+            _tls.raw = None
+        _tls.in_use = False
+        _tls.last = time.time()
+
+
+def get_db():
+    raw = getattr(_tls, "raw", None)
+    if raw is not None:
+        try:
+            if getattr(_tls, "in_use", False):
+                raw.rollback()  # the previous user crashed before closing: discard its unfinished work
+            if time.time() - getattr(_tls, "last", 0) > IDLE_CHECK_SECONDS:
+                cur = raw.cursor()
+                cur.execute("SELECT 1")
+                cur.fetchall()  # the server may have dropped an idle connection
+        except Exception:
+            raw = None
+    if raw is None:
+        raw = _open_raw()
+    _tls.raw = raw
+    _tls.in_use = True
+    return PooledConn(raw)
 
 
 # ───────────────────────── COURSES / SEMESTERS ─────────────────────────
@@ -2542,11 +2608,8 @@ def prepare_background(data: bytes):
 def get_background(v: int = 0):
     item = blob_get(("bg", v))
     if item is None:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT data, mime FROM du_background WHERE id = 1")
-        row = cursor.fetchone()
-        conn.close()
+        rows = _q("SELECT data, mime FROM du_background WHERE id = 1")
+        row = rows[0] if rows else None
         if not row or not row[0]:
             return HTMLResponse("No background", status_code=404)
         item = (row[1] or "image/jpeg", bytes(row[0]))
@@ -2746,11 +2809,15 @@ def diag(request: Request):
     if not is_admin(request):
         return HTMLResponse("Unauthorized.", status_code=403)
     t = time.perf_counter()
-    conn = get_db()
+    raw = _open_raw()
     connect_ms = (time.perf_counter() - t) * 1000
-    cursor = conn.cursor()
+    cursor = raw.cursor()
+    t = time.perf_counter()
+    cursor.execute("SELECT 1")
+    cursor.fetchall()
+    first_ms = (time.perf_counter() - t) * 1000
     samples = []
-    for _ in range(5):
+    for _ in range(4):
         t = time.perf_counter()
         cursor.execute("SELECT 1")
         cursor.fetchall()
@@ -2759,7 +2826,10 @@ def diag(request: Request):
     cursor.execute("SELECT COUNT(*), COALESCE(SUM(LENGTH(file_data)), 0) FROM du_resources")
     n, total = cursor.fetchone()
     count_ms = (time.perf_counter() - t) * 1000
-    conn.close()
+    try:
+        raw.close()
+    except Exception:
+        pass
     avg = sum(samples) / len(samples)
     remote = bool(TURSO_DB_URL and TURSO_AUTH_TOKEN)
     if not remote:
@@ -2770,10 +2840,13 @@ def diag(request: Request):
         verdict = "Database speed is acceptable. Moving Render and Turso to the same region could still help."
     else:
         verdict = "Database is far from the app (each question takes a long round trip). Pages are now served from memory so visitors are no longer slowed by this, but admin actions and the first opening of a PDF still are. Put the Render service and the Turso database in the same region to fix that too."
+    if remote and first_ms > 3 * avg + 200:
+        verdict += f" Note: a new connection costs about {first_ms:.0f} ms for its first question; the app now keeps connections open so this is only paid once per worker."
     rows = [
         ("Database", "Turso (remote)" if remote else "Local file"),
         ("Time to open a database connection", f"{connect_ms:.0f} ms"),
-        ("Average time of one query (5 tests)", f"{avg:.0f} ms (fastest {min(samples):.0f}, slowest {max(samples):.0f})"),
+        ("First question on a brand-new connection", f"{first_ms:.0f} ms"),
+        ("Later questions on the same connection (4 tests)", f"{avg:.0f} ms on average (fastest {min(samples):.0f}, slowest {max(samples):.0f})"),
         ("Heavy query (count + total PDF size)", f"{count_ms:.0f} ms"),
         ("Papers stored / total PDF size", f"{n} / {int(total) / 1048576:.1f} MB"),
         ("Catalogue kept in memory", f"{len(SNAP['papers'])} papers, last refreshed {int(time.time() - SNAP['at'])} s ago"),
@@ -2795,11 +2868,8 @@ def get_pdf(item_id: int):
     item = blob_get(("pdf", item_id))
     if item:
         return item
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT title, file_data FROM du_resources WHERE id = ?", (item_id,))
-    row = cursor.fetchone()
-    conn.close()
+    rows = _q("SELECT title, file_data FROM du_resources WHERE id = ?", (item_id,))
+    row = rows[0] if rows else None
     if not row or not row[1]:
         return None
     item = (row[0], bytes(row[1]))
