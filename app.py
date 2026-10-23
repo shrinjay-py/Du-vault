@@ -1091,8 +1091,14 @@ self.addEventListener('fetch', (e) => {
 });"""
 
 
-@app.get("/healthz")
+@app.api_route("/healthz", methods=["GET", "HEAD"])
 def healthz():
+    """Point your uptime bot here. Answers both GET and HEAD (some bots use HEAD), and each ping also keeps the
+    in-memory catalogue and database connections warm so the next real visitor gets an instant page."""
+    try:
+        ensure_snapshot()
+    except Exception:
+        pass  # a database hiccup must not make the health check fail
     return {"status": "healthy"}
 
 
@@ -1970,7 +1976,7 @@ def crumbs_html(course: str, subject: str, q: str) -> str:
     return '<nav class="crumbs">' + " <span>›</span> ".join(parts) + "</nav>"
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def index(request: Request, q: str = "", course: str = "", sem: str = "All Semesters", subject: str = "", notice: str = "", year: str = ""):
     admin = is_admin(request)
     ensure_snapshot()  # keeps the in-memory catalogue fresh (quietly, in the background)
@@ -2836,8 +2842,8 @@ def diag(request: Request):
         verdict = "Using a local database file (no Turso variables set). Papers saved this way are lost whenever Render redeploys."
     elif avg < 40:
         verdict = "Database is close and fast. If pages still feel slow, the cause is the phone's network or Render's small CPU."
-    elif avg < 120:
-        verdict = "Database speed is acceptable. Moving Render and Turso to the same region could still help."
+    elif avg < 170:
+        verdict = "Database speed is good for this distance (about 130 ms per question is normal between Singapore and Mumbai). Nothing to fix here."
     else:
         verdict = "Database is far from the app (each question takes a long round trip). Pages are now served from memory so visitors are no longer slowed by this, but admin actions and the first opening of a PDF still are. Put the Render service and the Turso database in the same region to fix that too."
     if remote and first_ms > 3 * avg + 200:
